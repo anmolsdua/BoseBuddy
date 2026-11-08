@@ -1,7 +1,7 @@
 // Update these two values when the release or donation page changes.
 const VERSION = "1.1.4";
 const DOWNLOAD_URL = `https://github.com/anmolsdua/BoseBuddy/releases/download/v${VERSION}/BoseBuddy-${VERSION}.dmg`;
-const DONATE_URL = "https://www.buymeacoffee.com/anmolsdua";
+const DONATE_URL = "https://buymeacoffee.com/buddiapps";
 
 const dialog = document.getElementById("downloadDialog");
 const confirmButton = document.getElementById("confirmDownload");
