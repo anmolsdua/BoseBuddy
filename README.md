@@ -192,7 +192,7 @@ peer, and audio-profile transitions.
 Requirements: macOS 14+, Xcode command line tools (Swift 5.9+).
 
 ```sh
-git clone https://github.com/YOUR_NAME/BoseBuddy.git
+git clone https://github.com/anmolsdua/BoseBuddy.git
 cd BoseBuddy
 make build      # dist/BoseBuddy.app (universal)
 make package    # dist/release/*.zip, *.dmg, source zip, SHA256SUMS
