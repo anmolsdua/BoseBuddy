@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.4 — 2026-11-08
+
+- Hide unnamed MAC-only entries in the paired-device list by default. These
+  are stale entries in the headphones' memory that the Bose app suppresses.
+- Add **Show unnamed devices** to the gear menu for anyone who wants the full
+  list.
+- Switching still defaults to disconnecting the non-Mac device.
+
 ## 1.1.3 — 2026-11-08
 
 - Switching now defaults to disconnecting the **non-Mac** device, so the Mac

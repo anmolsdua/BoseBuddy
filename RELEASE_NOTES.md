@@ -1,23 +1,25 @@
-# BoseBuddy 1.1.3
+# BoseBuddy 1.1.4
 
 BoseBuddy attaches to the headphones over the Mac's existing Bluetooth
 connection.
 
 ## What changed
 
-- Switching now defaults to disconnecting the **non-Mac** device. The Mac keeps
-  its connection and no prompt appears.
-- The chooser is opt-in. Turn on **Ask which device to disconnect** in the gear
-  menu if you want to pick which device to drop.
-- Opening BoseBuddy still makes no new Bluetooth connection, so it cannot
-  displace the iPhone/iPad connection.
+- **Unnamed stale entries are hidden.** The headphones' paired-device memory can
+  contain entries with no name, whose display name is just their MAC address.
+  The Bose app suppresses these; BoseBuddy now does too by default.
+- **Show unnamed devices** is available in the gear menu if you want to see the
+  full list.
+- Switching still defaults to disconnecting the **non-Mac** device, so the Mac
+  keeps its slot.
+- Opening BoseBuddy still makes no new Bluetooth connection.
 
 ## Install (read this first)
 
 BoseBuddy is **not notarized**, so macOS Gatekeeper blocks the first launch.
 That is expected, not a damaged download.
 
-1. Download `BoseBuddy-1.1.3.dmg`.
+1. Download `BoseBuddy-1.1.4.dmg`.
 2. Open it and drag **BoseBuddy** to **Applications**.
 3. Open it once past Gatekeeper:
    - **Right-click BoseBuddy -> Open -> Open** in Applications, or

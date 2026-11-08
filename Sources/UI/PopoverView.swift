@@ -22,6 +22,7 @@ struct PopoverView: View {
 
     @State private var showEqualizer = false
     @State private var confirmPowerOff = false
+    @AppStorage("showUnnamedDevices") private var showUnnamedDevices = false
 
     private var isConnected: Bool { model.linkState.isConnected }
 
@@ -292,7 +293,7 @@ struct PopoverView: View {
                 pendingSwitchCard(pending)
             }
 
-            if model.peers.isEmpty {
+            if visiblePeers.isEmpty {
                 HStack(spacing: 8) {
                     if !model.peersLoaded {
                         ProgressView().controlSize(.mini)
@@ -300,7 +301,9 @@ struct PopoverView: View {
                     Text(!model.peersLoaded
                          ? "Reading paired devices…"
                          : model.supportsPeers
-                            ? "No devices paired with the headphones."
+                            ? (model.peers.isEmpty
+                                ? "No devices paired with the headphones."
+                                : "No named devices are paired. Turn on “Show unnamed devices” in the gear menu.")
                             : "Couldn't read the headphones' device list.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -309,7 +312,7 @@ struct PopoverView: View {
                 .padding(.vertical, 4)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(model.peers.enumerated()), id: \.element.id) { index, peer in
+                    ForEach(Array(visiblePeers.enumerated()), id: \.element.id) { index, peer in
                         if index > 0 {
                             Divider().opacity(0.4).padding(.leading, 28)
                         }
@@ -336,6 +339,20 @@ struct PopoverView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(Capsule().fill(Color.primary.opacity(0.06)))
+    }
+
+    private var visiblePeers: [BosePeer] {
+        model.peers.filter { peer in
+            showUnnamedDevices || peer.isLocal || peer.connected || !isUnnamed(peer)
+        }
+    }
+
+    private func isUnnamed(_ peer: BosePeer) -> Bool {
+        let name = peer.displayName.uppercased()
+        let mac = peer.mac.uppercased()
+        return name == mac
+            || name == mac.replacingOccurrences(of: ":", with: "-")
+            || name == mac.replacingOccurrences(of: ":", with: "")
     }
 
     private var connectedPeerCount: Int {
@@ -676,6 +693,7 @@ struct PopoverView: View {
                 Divider()
                 Toggle("Show battery in menu bar", isOn: $model.showBatteryInMenuBar)
                 Toggle("Ask which device to disconnect", isOn: $model.confirmBeforeSwitch)
+                Toggle("Show unnamed devices", isOn: $showUnnamedDevices)
                 Toggle("Launch at login", isOn: Binding(
                     get: { model.launchAtLogin },
                     set: { model.setLaunchAtLogin($0) }

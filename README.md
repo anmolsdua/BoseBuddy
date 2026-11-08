@@ -47,7 +47,7 @@ restart.
 
 ### From a release (recommended)
 
-1. Download **`BoseBuddy-1.1.3.dmg`** from the
+1. Download **`BoseBuddy-1.1.4.dmg`** from the
    [Releases](../../releases) page.
 2. Open the DMG and drag **BoseBuddy** to **Applications**. Eject the DMG.
 3. **The first launch is blocked by Gatekeeper.** BoseBuddy is ad-hoc signed
@@ -153,6 +153,9 @@ Connected to: Mac + iPhone
 By default, switching disconnects the **non-Mac** device automatically. Turn on
 **Ask which device to disconnect** in the gear menu to choose which device to
 drop instead.
+
+Unnamed stale entries in the headphones' paired-device memory are hidden by
+default. Turn on **Show unnamed devices** in the gear menu to reveal them.
 
 ### Menu bar
 
