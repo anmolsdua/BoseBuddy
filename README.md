@@ -27,6 +27,22 @@ BoseBuddy uses the Mac’s existing Bluetooth pairing. There is no separate
 pairing step; macOS remembers the headphones and reconnects them after a
 restart.
 
+## Compatibility
+
+Tested on **Bose QC Headphones** (`prince`, product ID `0x4075`, firmware 1.0.6).
+
+BoseBuddy speaks BMAP over Bluetooth RFCOMM and probes channels 8, 2, and 9.
+The QC Ultra, QC45, and NC700 use the same protocol family, so the core
+features — battery, multipoint, paired-device management, connect/disconnect,
+modes, and EQ — are expected to work. Model-specific extras such as Immersive
+Audio, wind block, or a different mode/EQ layout are not exposed and may differ.
+
+Only one Bose headphone is managed at a time. If several are paired, the app
+uses the first connected one.
+
+If a model does not connect, open an issue with
+`~/Library/Logs/BoseBuddy.log`.
+
 ## Features
 
 - Paired-device list with green connected indicators and an active-audio marker.
