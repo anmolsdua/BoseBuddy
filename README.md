@@ -90,8 +90,8 @@ not:
 
 Notarization requires a paid Apple Developer ID. BoseBuddy is a local,
 open-source utility, so releases are ad-hoc signed. Gatekeeper asks once; the
-source is available and the download can be checked against
-`SHA256SUMS.txt`. The app has no networking, accounts, telemetry, or cloud.
+full source is available and can be rebuilt with `make package`. The app has no
+networking, accounts, telemetry, or cloud.
 
 ## Pairing
 

@@ -84,14 +84,6 @@ Control: BLE  ·  Audio: Mac + iPhone
 Use **Connect audio** on *This Mac* to bring up the Mac's audio without
 dropping the other device.
 
-## Verify the download (optional)
-
-```sh
-shasum -a 256 BoseBuddy-1.0.0.dmg
-```
-
-Compare the output with `SHA256SUMS.txt` from the same release.
-
 ## Why isn't it notarized?
 
 Notarization requires a paid Apple Developer ID and an Apple review of every
@@ -108,7 +100,7 @@ headphones over Bluetooth and writes a capped local log at
 - Confirm the app is in **/Applications**, not in the DMG or Downloads.
 - Run the Terminal command from Option C.
 - Check **System Settings → Privacy & Security** for a blocked-app message.
-- Re-download the DMG and compare `SHA256SUMS.txt`.
+- Re-download the DMG.
 - Build from source:
   ```sh
   make package
