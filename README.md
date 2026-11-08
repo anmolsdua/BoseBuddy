@@ -3,9 +3,9 @@
 **Control Bose QuietComfort headphones from the macOS menu bar — no phone app,
 no Bose account, no cloud.**
 
-BoseBuddy talks to the headphones directly over Bluetooth. It was built for the
-QuietComfort Headphones (`prince`, product ID `0x4075`) and uses the same
-reverse-engineered BMAP command set as the bigger tools.
+BoseBuddy talks to the headphones through the Mac’s **Bluetooth** connection. Once the headphones are paired with macOS, BoseBuddy can manage the
+other multipoint device, switch sources, change modes, adjust EQ, and read the
+battery.
 
 <p align="center">
   <img src="docs/popover.png" width="360" alt="BoseBuddy menu bar panel">
@@ -13,15 +13,19 @@ reverse-engineered BMAP command set as the bigger tools.
 
 ## Why
 
-The Bose app is the only official place to manage the headphones' paired
+The Bose app is the only official place to manage the headphones’ paired
 devices. BoseBuddy gives you that on macOS, plus a few things the phone app does
 not:
 
-- **BLE control does not use one of the two audio slots.** Keep the headphones
-  paired to your iPad and iPhone and still control them from the Mac.
-- **Switch the Mac's audio in on demand** without dropping the other device.
-- **Choose what to drop** when both audio slots are full.
-- **No account, no cloud, no analytics.**
+- Manage the **other** connected device from the Mac.
+- Bring the Mac’s audio online on demand.
+- Choose which device to drop when both audio slots are full.
+- No account, no cloud, no analytics.
+
+**The Mac must be connected to the headphones for BoseBuddy to control them.**
+BoseBuddy uses the Mac’s existing Bluetooth pairing. There is no separate
+pairing step; macOS remembers the headphones and reconnects them after a
+restart.
 
 ## Features
 
@@ -37,16 +41,17 @@ not:
 - Multipoint on/off and pairing mode.
 - Menu bar battery, launch at login, local diagnostics.
 - Universal binary (Apple Silicon + Intel), macOS 14+.
+- **No separate pairing step** — the app uses the Mac’s normal Bluetooth pairing.
 
 ## Install
 
 ### From a release (recommended)
 
-1. Download **`BoseBuddy-1.0.0.dmg`** from the
+1. Download **`BoseBuddy-1.1.0.dmg`** from the
    [Releases](../../releases) page.
 2. Open the DMG and drag **BoseBuddy** to **Applications**. Eject the DMG.
 3. **The first launch is blocked by Gatekeeper.** BoseBuddy is ad-hoc signed
-   and not notarized, so macOS says it can't verify the app. This is expected.
+   and not notarized, so macOS says it can’t verify the app. This is expected.
    Open it once with one of these:
 
    - **Right-click → Open** in Applications, then **Open**.
@@ -67,9 +72,12 @@ not:
 4. macOS asks for **Bluetooth** access. Click **Allow**. This happens once per
    install — the app uses a stable code requirement so later launches and
    rebuilds reuse the grant.
-5. Follow the setup guide: put the headphones in **pairing mode** (hold the
-   Bluetooth button until the light blinks), keep them near the Mac, and click
-   **Pair now**.
+5. Connect the headphones to the Mac:
+   1. If they are not paired with macOS yet, put them in **pairing mode** —
+      hold the Bluetooth button until the light blinks.
+   2. Open **System Settings → Bluetooth** and connect **Bose QC Headphones**
+      to this Mac.
+   3. Open BoseBuddy and click **Connect** (or follow the setup guide).
 6. Click the **Bose logo** in the menu bar.
 
 <p align="center">
@@ -83,8 +91,8 @@ not:
       **System Settings → Privacy & Security → Open Anyway**.
 - [ ] macOS Bluetooth permission is granted (System Settings → Privacy &
       Security → Bluetooth).
-- [ ] Headphones are in **pairing mode** for the one-time BLE bond.
-- [ ] The Bose app on your phone is **closed** while pairing (one BLE central).
+- [ ] The headphones are **paired with this Mac** and connected.
+- [ ] BoseBuddy says `Connected to: Mac + iPhone` and shows the headphones.
 
 ### Why is it unsigned?
 
@@ -93,43 +101,49 @@ open-source utility, so releases are ad-hoc signed. Gatekeeper asks once; the
 full source is available and can be rebuilt with `make package`. The app has no
 networking, accounts, telemetry, or cloud.
 
-## Pairing
+## Pairing and connecting
 
-BoseBuddy uses the Bose BLE service (`0000FEBE-…`) with the secure characteristic
-(`C65B8F2F-…`). The first bond is created while the headphones are in pairing
-mode; afterwards it persists.
+BoseBuddy uses the Mac’s existing Bluetooth pairing and opens the headphones’
+RFCOMM channel.
 
-If BoseBuddy says **Bluetooth LE pairing required**:
+- **First time:** put the headphones in pairing mode (hold the Bluetooth button
+  until the light blinks), then connect them to the Mac in **System Settings →
+  Bluetooth**. Open BoseBuddy and click **Connect**.
+- **After a headphone restart:** turn them on and connect them to the Mac
+  (macOS may reconnect automatically). BoseBuddy reconnects over the same
+  pairing; there is no separate re-pair.
+- **If the Mac is not connected:** BoseBuddy cannot control the headphones.
+  This is intentional. Connect the Mac in System Settings → Bluetooth first.
+- The headphones support two audio devices at once. The Mac must be one of
+  them; the other slot is free for your phone or tablet. If both slots are
+  taken by other devices, disconnect one or use the headphones’ Bluetooth
+  button to switch.
 
-1. Put the headphones in pairing mode.
-2. Open the menu bar panel.
-3. Click **Retry BLE pairing** (or **Setup Guide…** in the gear menu).
-
-The iPhone's Bose app can take the single BLE connection. If BoseBuddy cannot
-find the headphones, close the Bose app and try again.
-
-Classic RFCOMM is still supported as a fallback. It uses one of the two audio
-slots; the gear menu has **Use Bluetooth LE for control** to switch modes.
+The iPhone’s Bose app can hold one of the two audio connections. If the Mac
+cannot connect, disconnect the phone or use the headphones’ Bluetooth button to
+free a slot.
 
 ## Using BoseBuddy
 
-The header separates the two things that used to be confused:
+The header shows what the headphones are connected to:
 
 ```
-Control: BLE  ·  Audio: Mac + iPhone
+Connected to: Mac + iPhone
 ```
 
-- **Control** is the app's link to the headphones (BLE or classic).
-- **Audio** lists the devices currently connected for audio (up to two).
-- A **green dot** in the device list means that device is connected for audio.
+- **Mac** and **iPhone** are the devices connected to the headphones (up to
+  two).
+- A **green dot** in the device list means that device is connected.
 - A **speaker icon** marks the device currently playing.
+- The Mac row shows **Control + Audio** when BoseBuddy is connected and the
+  Mac’s audio is on.
 
 ### Devices
 
 | Action | What it does |
 |---|---|
-| **Connect audio** on *This Mac* | Brings the Mac's audio online without dropping the other device. |
-| **Disconnect** | Drops that device's audio. BLE control stays connected. |
+| **Connect audio** on *This Mac* | Brings the Mac’s audio online without dropping the other device. |
+| **Disconnect** | Drops that device’s audio. BoseBuddy stays connected. |
 | **Connect / Switch** on another device | Connects it. If both slots are full, the chooser asks what to drop. |
 | **Multipoint** | Turns two-device mode on or off. |
 
@@ -147,7 +161,6 @@ The Bose logo shows the battery percentage. Click it to open the panel. The
 gear menu has:
 
 - Setup Guide…
-- Use Bluetooth LE for control
 - Reconnect control
 - Ask which device to disconnect
 - Show battery in menu bar
@@ -158,30 +171,37 @@ gear menu has:
 
 ## Troubleshooting
 
-**BoseBuddy doesn't appear in the menu bar.**
+**BoseBuddy doesn’t appear in the menu bar.**
 The menu bar may be full. Quit other menu bar apps, or run BoseBuddy again from
 Applications. The setup guide opens automatically on first launch.
 
+**“Headphones not connected.”**
+Pair and connect the headphones to the Mac in **System Settings → Bluetooth**,
+then click **Connect** in BoseBuddy. The app cannot control the headphones while
+the Mac is disconnected.
+
+**“Couldn’t reach the headphones.”**
+Make sure they are powered on and connected to this Mac. If both audio slots are
+taken by other devices, disconnect one or use the headphones’ Bluetooth button.
+
+**Control stops after a phone connects.**
+The headphones allow two audio devices. The phone may have taken a slot; use the
+headphones’ Bluetooth button to switch back to the Mac, or disconnect the phone
+in BoseBuddy if it is listed.
+
+**Mac audio doesn’t show up.**
+Click **Connect audio** on *This Mac*, then choose the headphones in
+**System Settings → Sound**. If it still doesn’t appear, press the Bluetooth
+button on the headphones once.
+
 **The Bluetooth prompt appears again after an update.**
-macOS ties the permission to the app's code signature. Releases use a stable
+macOS ties the permission to the app’s code signature. Releases use a stable
 designated requirement, so this should only happen once per install. If you
 build from source with a different signature, macOS may ask again.
 
-**“Bluetooth LE pairing required.”**
-Put the headphones in pairing mode and click **Retry BLE pairing**.
-
-**“Couldn't find the headphones.”**
-Make sure they're on, nearby, and not exclusively held by the Bose app on your
-phone. Close that app and retry.
-
-**Mac audio doesn't show up.**
-Click **Connect audio** on *This Mac*, then choose the headphones in
-**System Settings → Sound**. If it still doesn't appear, press the Bluetooth
-button on the headphones once.
-
-**Everything connects but no audio.**
-Check the macOS output device. The headphones can be connected for control
-(`Control: BLE`) while `Audio: off`; that's normal.
+**Gatekeeper blocks the app.**
+See **[INSTALL.md](INSTALL.md)**. Right-click **Open**, or use **System
+Settings → Privacy & Security → Open Anyway**. Do not click **Move to Trash**.
 
 **Diagnostics.**
 BoseBuddy writes a capped log to `~/Library/Logs/BoseBuddy.log` with connection,
@@ -195,7 +215,7 @@ Requirements: macOS 14+, Xcode command line tools (Swift 5.9+).
 git clone https://github.com/anmolsdua/BoseBuddy.git
 cd BoseBuddy
 make build      # dist/BoseBuddy.app (universal)
-make package    # dist/release/*.zip, *.dmg, source zip, SHA256SUMS
+make package    # dist/release/*.zip, *.dmg, source zip
 make selftest   # headless BMAP check against paired headphones
 ```
 
@@ -215,7 +235,7 @@ notarized.
 ```
 BoseBuddy/
   Sources/
-    Bose/            BMAP codec, BLE + RFCOMM transports, controller
+    Bose/            BMAP codec, RFCOMM transport, controller
     UI/              menu bar panel, setup guide
     System/          CoreAudio monitor, logging
     AppDelegate.swift
@@ -232,15 +252,13 @@ BoseBuddy/
 BMAP packets are `[fblock, function, flags, length, payload…]`; the low nibble
 of `flags` is the operator (`GET`, `SETGET`, `START`, `STATUS`, `ERROR`, …).
 
-BoseBuddy prefers BMAP over BLE:
+BoseBuddy talks BMAP over Bluetooth RFCOMM:
 
 | Item | Value |
 |---|---|
-| BLE service | `0000FEBE-0000-1000-8000-00805F9B34FB` |
-| Secure characteristic | `C65B8F2F-AEE2-4C89-B758-BC4892D6F2D8` |
-| Unsecure characteristic | `D417C028-9818-4354-99D1-2AC09D074591` |
-| Segmentation | 1-byte header, 19 data bytes per write |
-| Classic fallback | RFCOMM channel 8 (2 and 9 probed) |
+| Transport | RFCOMM (SPP) |
+| Channel | 8 |
+| Connection | The Mac’s existing pairing |
 
 Device management commands:
 
@@ -259,6 +277,10 @@ Device management commands:
 
 The same `CONNECT` command is used for *This Mac* to bring up A2DP on demand.
 
+> **Why must the Mac be connected?** BoseBuddy uses the Mac’s Bluetooth
+> connection and its existing pairing. There is no separate control channel to
+> set up.
+
 ## Privacy
 
 BoseBuddy has no networking, accounts, telemetry, or cloud. Everything stays
@@ -273,8 +295,6 @@ Protocol work builds on:
   engineering for QC Ultra and QuietComfort.
 - [MadEyez/quietrebellion](https://github.com/MadEyez/quietrebellion) — Android
   and Windows ports.
-- [NerdySouth/bozo](https://github.com/NerdySouth/bozo) — BMAP over BLE service
-  and segmentation.
 - [Gadgetbridge](https://gadgetbridge.org/gadgets/headphones/bose/) — Bose
   multipoint management reference.
 

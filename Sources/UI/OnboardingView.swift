@@ -94,8 +94,8 @@ struct OnboardingView: View {
                         "Switch audio devices",
                         "Connect, disconnect, or switch between the devices paired to your headphones.")
                 feature("wave.3.right",
-                        "BLE control",
-                        "Control works over Bluetooth LE — the Mac doesn’t need to use one of the two audio slots.")
+                        "Works with your Mac",
+                        "Uses the Mac’s normal Bluetooth connection, so the headphones never need re-pairing in BoseBuddy.")
                 feature("battery.75",
                         "Battery, modes, EQ",
                         "See battery and active audio, switch noise-control modes, adjust EQ, and more.")
@@ -208,18 +208,18 @@ struct OnboardingView: View {
 
     private var pairStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Pair your headphones.")
+            Text("Connect this Mac.")
                 .font(.system(size: 26, weight: .semibold))
 
-            Text("This is a one-time Bluetooth LE pairing. Afterwards BoseBuddy can control the headphones without using an audio slot.")
+            Text("BoseBuddy uses the Mac’s Bluetooth connection. Pair the headphones with macOS once; after that they reconnect normally.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 9) {
                 numbered(1, "Put the headphones in pairing mode — hold the Bluetooth button until the light blinks.")
-                numbered(2, "Keep them close to the Mac.")
-                numbered(3, "Click Pair now and allow the macOS Bluetooth prompt if it appears.")
+                numbered(2, "Open System Settings → Bluetooth and connect them to this Mac.")
+                numbered(3, "Come back and click Connect.")
             }
 
             if model.linkState.isConnected {
@@ -227,14 +227,11 @@ struct OnboardingView: View {
             } else if pairing {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Looking for the headphones…")
+                    Text("Connecting to the headphones…")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.top, 2)
-            } else if model.needsBLEBonding {
-                statusLine("exclamationmark.triangle.fill", .orange,
-                           "Pairing didn’t complete. Make sure the light is blinking, then try again.")
             } else if let pairError {
                 statusLine("exclamationmark.triangle.fill", .orange, pairError)
             }
@@ -242,10 +239,15 @@ struct OnboardingView: View {
             Spacer()
 
             HStack(spacing: 10) {
+                Button("Open Bluetooth Settings") {
+                    model.openBluetoothSettings()
+                }
+                .buttonStyle(.bordered)
+
                 Button {
                     pairNow()
                 } label: {
-                    Text(pairing ? "Pairing…" : "Pair now")
+                    Text(pairing ? "Connecting…" : "Connect")
                         .frame(minWidth: 90)
                 }
                 .buttonStyle(.borderedProminent)
@@ -396,14 +398,13 @@ struct OnboardingView: View {
         guard !pairing else { return }
         pairing = true
         pairError = nil
-        model.preferBLE = true
         Task { @MainActor in
             await model.connect()
             pairing = false
             if model.linkState.isConnected {
                 withAnimation { step = 3 }
             } else {
-                pairError = model.errorText ?? "Couldn’t find the headphones. Make sure they’re in pairing mode."
+                pairError = model.errorText ?? "Couldn’t connect. Make sure the headphones are paired with this Mac and turned on."
             }
         }
     }

@@ -108,7 +108,7 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
             _ = pump(until: { self.basebandConnected || device.isConnected() },
                      timeout: max(7, timeout))
             guard device.isConnected() else {
-                throw BmapError.transport("Couldn't reach the headphones. Make sure they're powered on and nearby.")
+                throw BmapError.transport("Couldn't reach the headphones. Connect them to this Mac in System Settings → Bluetooth, make sure they're powered on, then try again.")
             }
         }
 
@@ -130,7 +130,7 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
         }
 
         cleanupAfterFailedOpen()
-        throw BmapError.transport("Connected to the headphones but couldn't open the control channel.")
+        throw BmapError.transport("Connected to the headphones but couldn't open the Bluetooth channel.")
     }
 
     private func sendSync(_ packet: Data, expectReply: Bool, drain: Bool,

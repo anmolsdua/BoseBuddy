@@ -33,7 +33,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if let error = model.errorText, !model.needsBLEBonding {
+            if let error = model.errorText {
                 errorBanner(error)
             }
             if model.pairingMode {
@@ -107,14 +107,8 @@ struct PopoverView: View {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 6, height: 6)
-                    Text(controlStatusText)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Text("·")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                    Text(audioStatusText)
-                        .font(.system(size: 10))
+                    Text(headerStatusText)
+                        .font(.system(size: 9.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -129,9 +123,7 @@ struct PopoverView: View {
                 Button {
                     Task { await model.connect() }
                 } label: {
-                    Text(model.linkState.isConnecting
-                         ? (model.preferBLE ? "Searching…" : "Connecting…")
-                         : "Connect")
+                    Text(model.linkState.isConnecting ? "Connecting…" : "Connect")
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.borderedProminent)
@@ -144,25 +136,21 @@ struct PopoverView: View {
         .padding(.vertical, 12)
     }
 
-    private var controlStatusText: String {
+    private var headerStatusText: String {
         switch model.linkState {
         case .connected:
-            return "Control: \(model.transport?.rawValue ?? "BLE")"
+            let names = connectionNames
+            return "Connected to: " + (names.isEmpty ? "none" : names.joined(separator: " + "))
         case .connecting:
-            return model.preferBLE ? "Searching…" : "Connecting…"
+            return "Connecting…"
         case .failed, .disconnected:
             return "Not connected"
         }
     }
 
-    private var audioStatusText: String {
-        let names = connectedAudioNames
-        return names.isEmpty ? "Audio: off" : "Audio: " + names.joined(separator: " + ")
-    }
-
-    private var connectedAudioNames: [String] {
+    private var connectionNames: [String] {
         var names: [String] = []
-        if model.audioAvailable { names.append("Mac") }
+        if model.linkState.isConnected { names.append("Mac") }
         for peer in model.peers where peer.connected && !peer.isLocal {
             let name = shortAudioName(peer.displayName)
             if !names.contains(name) { names.append(name) }
@@ -412,8 +400,7 @@ struct PopoverView: View {
             Image(systemName: peer.symbolName)
                 .font(.system(size: 13))
                 .frame(width: 18)
-                .foregroundStyle(peer.connected || (peer.isLocal && model.audioAvailable)
-                                 ? Color.primary : Color.secondary)
+                .foregroundStyle(isAudioConnected(peer) ? Color.primary : Color.secondary)
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
@@ -494,7 +481,7 @@ struct PopoverView: View {
     }
 
     private func isAudioConnected(_ peer: BosePeer) -> Bool {
-        peer.isLocal ? model.audioAvailable : peer.connected
+        peer.isLocal ? model.linkState.isConnected : peer.connected
     }
 
     private func peerStatus(_ peer: BosePeer) -> String {
@@ -622,59 +609,32 @@ struct PopoverView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 24)
 
-            Text(model.needsBLEBonding ? "Pair BoseBuddy over Bluetooth LE" : "Headphones not connected")
+            Text("Connect your headphones")
                 .font(.system(size: 14, weight: .semibold))
 
-            if model.needsBLEBonding {
-                Text("Put the headphones in pairing mode — hold the Bluetooth button until the light blinks — then retry. This is a one-time setup. Afterwards BoseBuddy controls them over BLE without using an audio slot.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-
-                Button {
-                    model.preferBLE = true
-                    Task { await model.connect() }
-                } label: {
-                    Text(model.linkState.isConnecting ? "Searching…" : "Retry BLE pairing")
-                        .frame(minWidth: 120)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .controlSize(.regular)
-                .disabled(model.linkState.isConnecting)
-
-                Button("Use classic control (takes an audio slot)") {
-                    model.preferBLE = false
-                    Task { await model.connect() }
-                }
-                .buttonStyle(.link)
+            Text("BoseBuddy uses this Mac's Bluetooth connection. Pair the headphones with macOS, then connect them.")
                 .font(.system(size: 11))
-            } else {
-                Text("Turn the headphones on. BoseBuddy connects over Bluetooth LE — it doesn’t need to be one of the two audio devices.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 290)
 
-                Button {
-                    model.refreshPairedDevices()
-                    Task { await model.connect() }
-                } label: {
-                    Text(model.linkState.isConnecting ? "Searching…" : "Connect")
-                        .frame(minWidth: 90)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .controlSize(.regular)
-                .disabled(model.linkState.isConnecting)
-
-                Text("If BoseBuddy can’t find them, close the Bose app on your phone and try again.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
+            Button {
+                model.refreshPairedDevices()
+                Task { await model.connect() }
+            } label: {
+                Text(model.linkState.isConnecting ? "Connecting…" : "Connect")
+                    .frame(minWidth: 90)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .controlSize(.regular)
+            .disabled(model.linkState.isConnecting)
+
+            Text("Not paired yet? Put the headphones in pairing mode, then connect them to this Mac in System Settings → Bluetooth.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 290)
 
             Button("Open Bluetooth Settings") {
                 model.openBluetoothSettings()
@@ -714,8 +674,7 @@ struct PopoverView: View {
             .disabled(!isConnected)
 
             Menu {
-                Toggle("Use Bluetooth LE for control", isOn: $model.preferBLE)
-                Button("Reconnect control") {
+                Button("Reconnect") {
                     model.disconnect()
                     Task { await model.connect() }
                 }

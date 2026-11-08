@@ -6,11 +6,6 @@ import ServiceManagement
 
 @MainActor
 final class BoseController: ObservableObject {
-    enum Transport: String {
-        case ble = "BLE"
-        case classic = "Classic"
-    }
-
     enum LinkState: Equatable {
         case disconnected
         case connecting
@@ -49,8 +44,6 @@ final class BoseController: ObservableObject {
     @Published private(set) var sourceKind: SourceKind = .none
     @Published private(set) var pairingMode = false
     @Published private(set) var audioAvailable = false
-    @Published private(set) var transport: Transport?
-    @Published private(set) var needsBLEBonding = false
 
     @Published private(set) var supportsModes = false
     @Published private(set) var supportsEQ = false
@@ -72,11 +65,6 @@ final class BoseController: ObservableObject {
         }
     }
     @Published var launchAtLogin = false
-    @Published var preferBLE: Bool {
-        didSet {
-            UserDefaults.standard.set(preferBLE, forKey: Self.preferBLEKey)
-        }
-    }
     @Published var confirmBeforeSwitch: Bool {
         didSet {
             UserDefaults.standard.set(confirmBeforeSwitch, forKey: Self.confirmSwitchKey)
@@ -92,9 +80,7 @@ final class BoseController: ObservableObject {
 
     private static let batteryMenuBarKey = "showBatteryInMenuBar"
     private static let confirmSwitchKey = "confirmBeforeSwitch"
-    private static let preferBLEKey = "preferBLE"
     private let audioMonitor = AudioOutputMonitor()
-    private var bleLink: BLELink?
     private var link: RFCOMMLink?
     private var isRefreshing = false
     private var pollTimer: Timer?
@@ -107,7 +93,6 @@ final class BoseController: ObservableObject {
     init() {
         showBatteryInMenuBar = UserDefaults.standard.object(forKey: Self.batteryMenuBarKey) as? Bool ?? true
         confirmBeforeSwitch = UserDefaults.standard.object(forKey: Self.confirmSwitchKey) as? Bool ?? true
-        preferBLE = UserDefaults.standard.object(forKey: Self.preferBLEKey) as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
 
         audioMonitor.onChange = { [weak self] available in
@@ -127,15 +112,13 @@ final class BoseController: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
-        if preferBLE {
-            Task { await connect() }
-        } else {
-            Task {
-                let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
-                headphones = found
-                if let connected = found.first(where: { $0.connected }) {
-                    await connect(address: connected.address)
-                }
+        Task {
+            let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
+            headphones = found
+            if let connected = found.first(where: { $0.connected }) {
+                await connect(address: connected.address)
+            } else {
+                await connect()
             }
         }
     }
@@ -204,99 +187,24 @@ final class BoseController: ObservableObject {
         linkState = .connecting
         errorText = nil
         pairingMode = false
-        needsBLEBonding = false
-
-        if preferBLE {
-            do {
-                try await openBLE()
-                return
-            } catch let error as BLELinkError {
-                BarLog.write("BLE connect failed: \(error.localizedDescription)")
-                if case .needsBonding = error {
-                    // If macOS already has the headphones as an audio device,
-                    // classic control can still work without a BLE bond.
-                    let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
-                    headphones = found
-                    if let connected = found.first(where: { $0.connected }) {
-                        await openClassic(address: connected.address)
-                        return
-                    }
-                    needsBLEBonding = true
-                    let message = "Bluetooth LE pairing required. Put the headphones in pairing mode (hold the Bluetooth button until the light blinks), then tap Retry."
-                    linkState = .failed(message)
-                    errorText = message
-                    return
-                }
-                let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
-                headphones = found
-                if let connected = found.first(where: { $0.connected }) {
-                    await openClassic(address: connected.address)
-                    return
-                }
-                linkState = .failed(error.localizedDescription)
-                errorText = error.localizedDescription
-                return
-            } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                BarLog.write("BLE connect failed: \(message)")
-                if let connected = headphones.first(where: { $0.connected }) {
-                    await openClassic(address: connected.address)
-                    return
-                }
-                let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
-                headphones = found
-                if let connected = found.first(where: { $0.connected }) {
-                    await openClassic(address: connected.address)
-                    return
-                }
-                linkState = .failed(message)
-                errorText = message
-                return
-            }
-        }
 
         if headphones.isEmpty {
             let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
             headphones = found
         }
-        if let target = address
+
+        let target = address
             ?? headphones.first(where: { $0.connected })?.address
-            ?? (preferBLE ? nil : headphones.first?.address) {
-            await openClassic(address: target)
-        } else {
-            let message = "Headphones not connected. Turn them on so BoseBuddy can reach them over Bluetooth LE."
+            ?? headphones.first?.address
+
+        guard let target else {
+            let message = "Pair the headphones with this Mac first: open System Settings → Bluetooth, connect them, then try again."
             linkState = .failed(message)
             errorText = message
+            return
         }
-    }
 
-    private func openBLE() async throws {
-        let ble = BLELink()
-        ble.onClosed = { [weak self] in
-            Task { @MainActor in self?.handleControlClosed() }
-        }
-        try await ble.open()
-
-        bleLink = ble
-        link?.close()
-        link = nil
-        connectedAddress = nil
-        channelID = 0
-        transport = .ble
-        linkState = .connected
-        needsBLEBonding = false
-        BarLog.write("BLE control connected")
-        startWatchdog()
-        onStatusChange?()
-
-        if let name = try? await readProductName(), !name.isEmpty {
-            let clean = Self.friendlyName(name)
-            productName = clean
-            deviceName = clean
-            audioMonitor.nameHint = clean
-        }
-        firmware = (try? await readFirmware()) ?? ""
-        await refresh(deep: true)
+        await openClassic(address: target)
     }
 
     private func openClassic(address: String) async {
@@ -313,13 +221,10 @@ final class BoseController: ObservableObject {
                 Task { @MainActor in self?.handleControlClosed() }
             }
             link = newLink
-            bleLink?.close()
-            bleLink = nil
             channelID = channel
             connectedAddress = address
-            transport = .classic
             linkState = .connected
-            BarLog.write("classic control connected on channel \(channel) to \(address)")
+            BarLog.write("Bluetooth connection established on channel \(channel) to \(address)")
             startWatchdog()
             onStatusChange?()
 
@@ -334,9 +239,8 @@ final class BoseController: ObservableObject {
         } catch {
             newLink.close()
             link = nil
-            transport = nil
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            BarLog.write("classic connect failed: \(message)")
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            BarLog.write("connect failed: \(message)")
             linkState = .failed(message)
             errorText = message
         }
@@ -349,9 +253,6 @@ final class BoseController: ObservableObject {
         stopWatchdog()
         connectedAddress = nil
         linkState = .disconnected
-        transport = nil
-        bleLink?.close()
-        bleLink = nil
         link?.close()
         link = nil
         battery = nil
@@ -442,14 +343,12 @@ final class BoseController: ObservableObject {
 
     private func handleControlClosed() {
         guard linkState.isConnected else { return }
-        BarLog.write("control link closed")
-        bleLink = nil
+        BarLog.write("Bluetooth connection closed")
         link = nil
-        transport = nil
         linkState = .disconnected
         channelID = 0
         stopWatchdog()
-        errorText = "Control connection lost. Mac audio is unaffected; tap Connect to reconnect."
+        errorText = "Bluetooth connection lost. Mac audio may be unaffected; tap Connect to reconnect."
         onStatusChange?()
     }
 
@@ -844,8 +743,7 @@ final class BoseController: ObservableObject {
     func connectPeer(_ peer: BosePeer, force: Bool = false) async {
         guard linkState.isConnected, peerAction == nil, !peer.connected else { return }
 
-        // Count audio devices only. The BLE/classic control link does not use
-        // one of the headphones' two audio slots.
+        // Count audio devices only. The control link itself does not add a slot.
         let connectedPeers = peers.filter { $0.connected || ($0.isLocal && audioAvailable) }
         let atCapacity = connectedPeers.count >= 2
         let candidates = connectedPeers.filter { $0.mac != peer.mac }
@@ -1006,16 +904,9 @@ final class BoseController: ObservableObject {
                           timeout: TimeInterval = 2.8) async throws -> [BmapPacket] {
         let packet = BmapPacket(fblock: fblock, function: function, port: port,
                                 op: op, payload: Data(payload))
-        let data: Data
-        if let bleLink, bleLink.isOpen {
-            data = try await bleLink.send(packet.encoded(), expectReply: expectReply,
-                                          drain: drain, timeout: max(timeout, 2.8))
-        } else if let link {
-            data = try await link.send(packet.encoded(), expectReply: expectReply,
+        guard let link else { throw BmapError.notConnected }
+        let data = try await link.send(packet.encoded(), expectReply: expectReply,
                                        drain: drain, timeout: timeout)
-        } else {
-            throw BmapError.notConnected
-        }
         return BmapPacket.parseAll(data)
     }
 
@@ -1173,7 +1064,6 @@ final class BoseController: ObservableObject {
         productName = "Bose QC Headphones"
         firmware = "1.0.6-80+f5f219b"
         linkState = .connected
-        transport = .ble
         battery = 30
         modes = [
             BoseMode(index: 0, name: "Quiet", rawCNC: 0),
@@ -1208,7 +1098,6 @@ final class BoseController: ObservableObject {
         supportsMultipoint = true
         supportsPeers = true
         peersLoaded = true
-        needsBLEBonding = false
     }
 
     func loadDemoSwitchState() {
@@ -1224,8 +1113,7 @@ final class BoseController: ObservableObject {
 
     var debugSummary: String {
         var lines: [String] = []
-        lines.append("control: \(linkState) transport=\(transport?.rawValue ?? "-") channel=\(channelID)")
-        lines.append("BLE bonded: \(!needsBLEBonding)")
+        lines.append("connection: \(linkState) channel=\(channelID)")
         lines.append("name: \(productName.isEmpty ? deviceName : productName)")
         lines.append("firmware: \(firmware)")
         lines.append("battery: \(battery.map { "\($0)%" } ?? "?")\(charging ? " (charging)" : "")")

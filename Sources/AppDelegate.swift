@@ -14,7 +14,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var popover: NSPopover!
     private var cancellables = Set<AnyCancellable>()
     private var activityToken: NSObjectProtocol?
-    private var bleProbe: BLEProbe?
     private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -25,14 +24,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Monitor Bose headphone connection"
         )
-
-        if CommandLine.arguments.contains("--ble-probe") {
-            NSApp.activate(ignoringOtherApps: true)
-            let probe = BLEProbe()
-            bleProbe = probe
-            probe.start()
-            return
-        }
 
         if CommandLine.arguments.contains("--selftest") {
             runSelfTest()

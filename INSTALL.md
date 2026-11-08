@@ -9,7 +9,7 @@ later launches are normal.
 
 ## 1. Put BoseBuddy in Applications
 
-1. Download **`BoseBuddy-1.0.0.dmg`** from the Releases page.
+1. Download **`BoseBuddy-1.1.0.dmg`** from the Releases page.
 2. Open the DMG.
 3. Drag **BoseBuddy** into the **Applications** folder.
 4. Eject the DMG.
@@ -64,21 +64,26 @@ macOS asks for Bluetooth access the first time BoseBuddy connects:
 
 This is the normal macOS privacy prompt, not a Bose login.
 
-## 4. Pair the headphones
+## 4. Connect the headphones to this Mac
 
-1. Put the headphones in **pairing mode**: hold the Bluetooth button until the
-   light blinks (you may hear “Ready to pair”).
-2. Keep them near the Mac.
-3. Open BoseBuddy → follow the setup guide → **Pair now**.
-4. If the iPhone's Bose app is open, close it first — the headphones accept one
-   BLE central at a time.
+BoseBuddy uses the Mac's Bluetooth connection and its existing pairing. There
+is no separate pairing step to repeat after a restart.
+
+1. If the headphones are not paired with this Mac yet, put them in **pairing
+   mode**: hold the Bluetooth button until the light blinks.
+2. Open **System Settings → Bluetooth** and connect **Bose QC Headphones** to
+   this Mac.
+3. Open BoseBuddy and click **Connect** (or follow the setup guide).
+
+The Mac must be one of the headphones' two audio connections for BoseBuddy to
+control them. The other slot can be your phone or tablet.
 
 ## 5. Finish
 
 Click the **Bose logo** in the menu bar. The header shows:
 
 ```
-Control: BLE  ·  Audio: Mac + iPhone
+Connected to: Mac + iPhone
 ```
 
 Use **Connect audio** on *This Mac* to bring up the Mac's audio without
@@ -106,3 +111,12 @@ headphones over Bluetooth and writes a capped local log at
   make package
   open dist/BoseBuddy.app
   ```
+
+## If BoseBuddy can't connect
+
+- Make sure the headphones are paired with this Mac and connected in
+  **System Settings → Bluetooth**.
+- If both audio slots are taken by other devices, disconnect one or use the
+  headphones' Bluetooth button to switch.
+- Check **System Settings → Privacy & Security → Bluetooth** for BoseBuddy.
+- Diagnostics: `~/Library/Logs/BoseBuddy.log`.
