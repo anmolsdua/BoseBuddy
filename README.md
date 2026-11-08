@@ -3,6 +3,8 @@
 **Control Bose QuietComfort headphones from the macOS menu bar — no phone app,
 no Bose account, no cloud.**
 
+[Website](https://anmolsdua.github.io/BoseBuddy/) · [Releases](https://github.com/anmolsdua/BoseBuddy/releases) · [Buy me a coffee](https://www.buymeacoffee.com/anmolsdua)
+
 BoseBuddy talks to the headphones through the Mac’s **Bluetooth** connection. Once the headphones are paired with macOS, BoseBuddy can manage the
 other multipoint device, switch sources, change modes, adjust EQ, and read the
 battery.
@@ -318,6 +320,12 @@ Protocol work builds on:
 
 BoseBuddy is unaffiliated with Bose. Bose and QuietComfort are trademarks of Bose
 Corporation.
+
+## Support
+
+BoseBuddy is free and open source. If it saves you a trip to the phone app, you
+can [buy me a coffee](https://www.buymeacoffee.com/anmolsdua) — completely
+optional.
 
 ## License
 
