@@ -55,11 +55,14 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
 
     // MARK: - Async API
 
-    func open(address: String, channels: [UInt8], timeout: TimeInterval = 8) async throws -> UInt8 {
+    func open(address: String, channels: [UInt8], timeout: TimeInterval = 8,
+              allowExistingAudio: Bool = false) async throws -> UInt8 {
         try await withCheckedThrowingContinuation { continuation in
             io.perform {
                 do {
-                    let opened = try self.openSync(address: address, channels: channels, timeout: timeout)
+                    let opened = try self.openSync(address: address, channels: channels,
+                                                   timeout: timeout,
+                                                   allowExistingAudio: allowExistingAudio)
                     continuation.resume(returning: opened)
                 } catch {
                     continuation.resume(throwing: error)
@@ -89,7 +92,8 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
 
     // MARK: - IO thread
 
-    private func openSync(address: String, channels: [UInt8], timeout: TimeInterval) throws -> UInt8 {
+    private func openSync(address: String, channels: [UInt8], timeout: TimeInterval,
+                          allowExistingAudio: Bool) throws -> UInt8 {
         closeSync()
         closed = false
         let normalized = address.replacingOccurrences(of: ":", with: "-").lowercased()
@@ -98,8 +102,8 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
         }
         self.device = device
 
-        guard device.isConnected() else {
-            throw BmapError.transport("Connect the headphones to this Mac in System Settings → Bluetooth first.")
+        if !device.isConnected(), !allowExistingAudio {
+            throw BmapError.transport("Connect the headphones from the side button or the Bose app, then try again.")
         }
 
         for candidate in channels {

@@ -612,7 +612,7 @@ struct PopoverView: View {
             Text("Connect your headphones")
                 .font(.system(size: 14, weight: .semibold))
 
-            Text("BoseBuddy uses this Mac's Bluetooth connection. Pair the headphones with macOS, then connect them.")
+            Text("Connect the headphones from the side button or the Bose app on your phone, then click Connect.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -630,17 +630,12 @@ struct PopoverView: View {
             .controlSize(.regular)
             .disabled(model.linkState.isConnecting)
 
-            Text("Not paired yet? Put the headphones in pairing mode, then connect them to this Mac in System Settings → Bluetooth.")
+            Text("Use the headphones' Bluetooth button, or the Bose app on your iPhone/iPad/Android, to connect this Mac.")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 290)
 
-            Button("Open Bluetooth Settings") {
-                model.openBluetoothSettings()
-            }
-            .buttonStyle(.link)
-            .font(.system(size: 11))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)

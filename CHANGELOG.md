@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2 — 2026-11-08
+
+- BoseBuddy now recognizes a Mac that macOS already shows connected, even when
+  the IOBluetooth paired-device entry reports `connected=false`, and attaches
+  over the existing link.
+- Connection directions now point to the headphones' **Bluetooth button** or
+  the **Bose app** on iPhone/iPad/Android, not System Settings.
+
 ## 1.1.1 — 2026-11-08
 
 - Opening BoseBuddy no longer initiates a Bluetooth connection. It attaches

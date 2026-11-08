@@ -47,7 +47,7 @@ restart.
 
 ### From a release (recommended)
 
-1. Download **`BoseBuddy-1.1.1.dmg`** from the
+1. Download **`BoseBuddy-1.1.2.dmg`** from the
    [Releases](../../releases) page.
 2. Open the DMG and drag **BoseBuddy** to **Applications**. Eject the DMG.
 3. **The first launch is blocked by Gatekeeper.** BoseBuddy is ad-hoc signed
@@ -72,13 +72,11 @@ restart.
 4. macOS asks for **Bluetooth** access. Click **Allow**. This happens once per
    install — the app uses a stable code requirement so later launches and
    rebuilds reuse the grant.
-5. Connect the headphones to the Mac:
-   1. If they are not paired with macOS yet, put them in **pairing mode** —
-      hold the Bluetooth button until the light blinks.
-   2. Open **System Settings → Bluetooth** and connect **Bose QC Headphones**
-      to this Mac.
-   3. Open BoseBuddy and click **Connect** (or follow the setup guide).
-6. Click the **Bose logo** in the menu bar.
+5. Connect the headphones to this Mac from the headphones: press the
+   **Bluetooth button** to switch the connection to the Mac, or open the
+   **Bose app** on your iPhone/iPad/Android and select this Mac.
+6. Open BoseBuddy. It attaches automatically; if not, click **Connect**.
+7. Click the **Bose logo** in the menu bar.
 
 <p align="center">
   <img src="docs/onboarding.png" width="420" alt="BoseBuddy setup guide">
@@ -91,7 +89,7 @@ restart.
       **System Settings → Privacy & Security → Open Anyway**.
 - [ ] macOS Bluetooth permission is granted (System Settings → Privacy &
       Security → Bluetooth).
-- [ ] The headphones are **paired with this Mac** and connected.
+- [ ] The headphones are connected to this Mac (side button or Bose app).
 - [ ] BoseBuddy says `Connected to: Mac + iPhone` and shows the headphones.
 
 ### Why is it unsigned?
@@ -106,14 +104,15 @@ networking, accounts, telemetry, or cloud.
 BoseBuddy uses the Mac’s existing Bluetooth pairing and opens the headphones’
 RFCOMM channel.
 
-- **First time:** put the headphones in pairing mode (hold the Bluetooth button
-  until the light blinks), then connect them to the Mac in **System Settings →
-  Bluetooth**. Open BoseBuddy and click **Connect**.
-- **After a headphone restart:** turn them on and connect them to the Mac
-  (macOS may reconnect automatically). BoseBuddy reconnects over the same
-  pairing; there is no separate re-pair.
+- **First time:** connect the headphones to this Mac from the headphones' 
+  **Bluetooth button**, or from the **Bose app** on your iPhone/iPad/Android
+  and select this Mac. Open BoseBuddy; it attaches automatically.
+- **After a headphone restart:** press the Bluetooth button to switch the
+  connection back to the Mac, or use the Bose app. BoseBuddy reattaches; there
+  is no separate re-pair.
 - **If the Mac is not connected:** BoseBuddy cannot control the headphones.
-  This is intentional. Connect the Mac in System Settings → Bluetooth first.
+  This is intentional. Connect the Mac from the headphones' Bluetooth button or
+  the Bose app first.
 - The headphones support two audio devices at once. The Mac must be one of
   them; the other slot is free for your phone or tablet. If both slots are
   taken by other devices, disconnect one or use the headphones’ Bluetooth
@@ -176,13 +175,14 @@ The menu bar may be full. Quit other menu bar apps, or run BoseBuddy again from
 Applications. The setup guide opens automatically on first launch.
 
 **“Headphones not connected.”**
-Pair and connect the headphones to the Mac in **System Settings → Bluetooth**,
-then click **Connect** in BoseBuddy. The app cannot control the headphones while
-the Mac is disconnected.
+Connect the headphones to this Mac from the headphones' **Bluetooth button** or
+the **Bose app**, then click **Connect** in BoseBuddy. The app cannot control
+the headphones while the Mac is disconnected.
 
 **“Couldn’t reach the headphones.”**
-Make sure they are powered on and connected to this Mac. If both audio slots are
-taken by other devices, disconnect one or use the headphones’ Bluetooth button.
+Make sure they are powered on and connected to this Mac. Press the headphones'
+Bluetooth button to switch to the Mac, or use the Bose app. If both audio slots
+are taken, disconnect one.
 
 **Control stops after a phone connects.**
 The headphones allow two audio devices. The phone may have taken a slot; use the

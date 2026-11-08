@@ -143,11 +143,6 @@ struct OnboardingView: View {
             Spacer()
 
             HStack(spacing: 10) {
-                Button("Open Bluetooth Settings") {
-                    model.openBluetoothSettings()
-                }
-                .buttonStyle(.bordered)
-
                 Button {
                     withAnimation { step = 2 }
                 } label: {
@@ -211,14 +206,14 @@ struct OnboardingView: View {
             Text("Connect this Mac.")
                 .font(.system(size: 26, weight: .semibold))
 
-            Text("BoseBuddy uses the Mac’s Bluetooth connection. Pair the headphones with macOS once; after that they reconnect normally.")
+            Text("BoseBuddy uses the Mac’s Bluetooth connection. Connect the headphones from the side button or the Bose app on your phone.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 9) {
-                numbered(1, "Put the headphones in pairing mode — hold the Bluetooth button until the light blinks.")
-                numbered(2, "Open System Settings → Bluetooth and connect them to this Mac.")
+                numbered(1, "Press the Bluetooth button on the headphones to switch the connection to this Mac.")
+                numbered(2, "Or open the Bose app on your iPhone, iPad, or Android device and select this Mac.")
                 numbered(3, "Come back and click Connect.")
             }
 
@@ -239,11 +234,6 @@ struct OnboardingView: View {
             Spacer()
 
             HStack(spacing: 10) {
-                Button("Open Bluetooth Settings") {
-                    model.openBluetoothSettings()
-                }
-                .buttonStyle(.bordered)
-
                 Button {
                     pairNow()
                 } label: {

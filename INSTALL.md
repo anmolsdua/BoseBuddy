@@ -9,7 +9,7 @@ later launches are normal.
 
 ## 1. Put BoseBuddy in Applications
 
-1. Download **`BoseBuddy-1.1.1.dmg`** from the Releases page.
+1. Download **`BoseBuddy-1.1.2.dmg`** from the Releases page.
 2. Open the DMG.
 3. Drag **BoseBuddy** into the **Applications** folder.
 4. Eject the DMG.
@@ -69,11 +69,11 @@ This is the normal macOS privacy prompt, not a Bose login.
 BoseBuddy uses the Mac's Bluetooth connection and its existing pairing. There
 is no separate pairing step to repeat after a restart.
 
-1. If the headphones are not paired with this Mac yet, put them in **pairing
-   mode**: hold the Bluetooth button until the light blinks.
-2. Open **System Settings → Bluetooth** and connect **Bose QC Headphones** to
+1. Press the **Bluetooth button** on the headphones to switch the connection to
    this Mac.
-3. Open BoseBuddy and click **Connect** (or follow the setup guide).
+2. Or open the **Bose app** on your iPhone, iPad, or Android device and select
+   this Mac.
+3. Open BoseBuddy. It attaches automatically; if not, click **Connect**.
 
 The Mac must be one of the headphones' two audio connections for BoseBuddy to
 control them. The other slot can be your phone or tablet.
@@ -114,9 +114,8 @@ headphones over Bluetooth and writes a capped local log at
 
 ## If BoseBuddy can't connect
 
-- Make sure the headphones are paired with this Mac and connected in
-  **System Settings → Bluetooth**.
-- If both audio slots are taken by other devices, disconnect one or use the
-  headphones' Bluetooth button to switch.
+- Press the headphones' **Bluetooth button** to switch the connection to this
+  Mac, or use the **Bose app** on your phone/tablet.
+- If both audio slots are taken, disconnect one.
 - Check **System Settings → Privacy & Security → Bluetooth** for BoseBuddy.
 - Diagnostics: `~/Library/Logs/BoseBuddy.log`.

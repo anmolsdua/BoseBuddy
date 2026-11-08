@@ -120,6 +120,8 @@ final class BoseController: ObservableObject {
             // displace another device's connection.
             if let connected = found.first(where: { $0.connected }) {
                 await connect(address: connected.address)
+            } else if audioAvailable, let first = found.first {
+                await connect(address: first.address)
             }
         }
     }
@@ -134,7 +136,7 @@ final class BoseController: ObservableObject {
                 await loadPeers()
             }
         } else if linkState != .connecting,
-                  headphones.contains(where: { $0.connected }) {
+                  headphones.contains(where: { $0.connected }) || (audioAvailable && !headphones.isEmpty) {
             Task { await connect() }
         }
         startPolling()
@@ -197,9 +199,10 @@ final class BoseController: ObservableObject {
 
         let target = address
             ?? headphones.first(where: { $0.connected })?.address
+            ?? (audioAvailable ? headphones.first?.address : nil)
 
         guard let target else {
-            let message = "Connect the headphones to this Mac first: open System Settings → Bluetooth, connect them, then try again."
+            let message = "Connect the headphones from the side button or the Bose app on your phone, then try again."
             linkState = .failed(message)
             errorText = message
             return
@@ -216,7 +219,8 @@ final class BoseController: ObservableObject {
             let channel = try await newLink.open(
                 address: address,
                 channels: Self.channelCandidates(for: pairedName),
-                timeout: 8
+                timeout: 8,
+                allowExistingAudio: audioAvailable
             )
             newLink.onClosed = { [weak self] in
                 Task { @MainActor in self?.handleControlClosed() }
