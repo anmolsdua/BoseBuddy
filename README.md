@@ -18,7 +18,6 @@ devices. BoseBuddy gives you that on macOS, plus a few things the phone app does
 not:
 
 - Manage the **other** connected device from the Mac.
-- Bring the Mac’s audio online on demand.
 - Choose which device to drop when both audio slots are full.
 - No account, no cloud, no analytics.
 
