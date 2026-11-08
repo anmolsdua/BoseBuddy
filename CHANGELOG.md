@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 — 2026-11-08
+
+- Opening BoseBuddy no longer initiates a Bluetooth connection. It attaches
+  only when the Mac is already connected, so opening the menu cannot displace
+  the iPhone/iPad connection.
+- If the Mac is not connected, **Connect** now asks you to connect the
+  headphones in System Settings → Bluetooth first.
+
 ## 1.1.0 — 2026-11-08
 
 - Simplified the connection to use the Mac's existing Bluetooth pairing;

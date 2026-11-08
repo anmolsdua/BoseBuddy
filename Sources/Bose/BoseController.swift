@@ -115,10 +115,11 @@ final class BoseController: ObservableObject {
         Task {
             let found = await Task.detached(priority: .utility) { Self.pairedHeadphones() }.value
             headphones = found
+            // Never initiate a new Bluetooth connection from here. Only attach
+            // if the Mac is already connected, so opening BoseBuddy cannot
+            // displace another device's connection.
             if let connected = found.first(where: { $0.connected }) {
                 await connect(address: connected.address)
-            } else {
-                await connect()
             }
         }
     }
@@ -132,7 +133,8 @@ final class BoseController: ObservableObject {
                 await readSource()
                 await loadPeers()
             }
-        } else if linkState != .connecting {
+        } else if linkState != .connecting,
+                  headphones.contains(where: { $0.connected }) {
             Task { await connect() }
         }
         startPolling()
@@ -195,10 +197,9 @@ final class BoseController: ObservableObject {
 
         let target = address
             ?? headphones.first(where: { $0.connected })?.address
-            ?? headphones.first?.address
 
         guard let target else {
-            let message = "Pair the headphones with this Mac first: open System Settings → Bluetooth, connect them, then try again."
+            let message = "Connect the headphones to this Mac first: open System Settings → Bluetooth, connect them, then try again."
             linkState = .failed(message)
             errorText = message
             return

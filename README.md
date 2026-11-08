@@ -47,7 +47,7 @@ restart.
 
 ### From a release (recommended)
 
-1. Download **`BoseBuddy-1.1.0.dmg`** from the
+1. Download **`BoseBuddy-1.1.1.dmg`** from the
    [Releases](../../releases) page.
 2. Open the DMG and drag **BoseBuddy** to **Applications**. Eject the DMG.
 3. **The first launch is blocked by Gatekeeper.** BoseBuddy is ad-hoc signed

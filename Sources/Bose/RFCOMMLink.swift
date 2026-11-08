@@ -98,18 +98,8 @@ final class RFCOMMLink: NSObject, IOBluetoothRFCOMMChannelDelegate, @unchecked S
         }
         self.device = device
 
-        if !device.isConnected() {
-            openedBaseband = true
-            basebandConnected = false
-            let issued = device.openConnection(self)
-            guard issued == kIOReturnSuccess else {
-                throw BmapError.transport("Couldn't start a connection to the headphones (status \(issued)).")
-            }
-            _ = pump(until: { self.basebandConnected || device.isConnected() },
-                     timeout: max(7, timeout))
-            guard device.isConnected() else {
-                throw BmapError.transport("Couldn't reach the headphones. Connect them to this Mac in System Settings → Bluetooth, make sure they're powered on, then try again.")
-            }
+        guard device.isConnected() else {
+            throw BmapError.transport("Connect the headphones to this Mac in System Settings → Bluetooth first.")
         }
 
         for candidate in channels {

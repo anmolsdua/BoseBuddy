@@ -1,36 +1,24 @@
-# BoseBuddy 1.1.0
+# BoseBuddy 1.1.1
 
-Control Bose QuietComfort headphones from the macOS menu bar - no phone app,
-no Bose account, no cloud.
+BoseBuddy attaches to the headphones over the Mac's existing Bluetooth
+connection. This release fixes the case where opening the menu bar panel could
+drop the iPhone/iPad connection.
 
-## What changed in 1.1.0
+## What changed
 
-- **Simpler Bluetooth connection.** BoseBuddy now uses the Mac's existing
-  Bluetooth pairing. There is no separate pairing step, and the headphones
-  reconnect normally after a restart.
-- **The Mac must be connected.** BoseBuddy manages the headphones while this Mac
-  is one of their two audio connections; it is not a remote control when the Mac
-  is disconnected.
-- The setup guide now walks through connecting the headphones to macOS instead
-  of a separate pairing step.
-- The header reads `Connected to: ...`, and the Mac row shows
-  `Control + Audio`.
-
-## Highlights
-
-- **Device switching** with a chooser: when both audio slots are full, pick
-  which device to disconnect. The prompt is on by default.
-- **Mac audio on demand.** `Connect audio` brings this Mac online without
-  touching the other device.
-- **Battery, modes, EQ, sidetone**, and the active audio device at a glance.
-- **No separate re-pairing** after headphone restarts.
+- Opening BoseBuddy no longer starts a Bluetooth connection. If the Mac is not
+  already connected, the app waits and shows a Connect prompt.
+- **Connect** only attaches to an existing Mac connection. If there is none,
+  it asks you to connect the headphones in System Settings -> Bluetooth first.
+- This means opening the menu can no longer displace the connection held by the
+  iPhone or iPad.
 
 ## Install (read this first)
 
 BoseBuddy is **not notarized**, so macOS Gatekeeper blocks the first launch.
 That is expected, not a damaged download.
 
-1. Download `BoseBuddy-1.1.0.dmg`.
+1. Download `BoseBuddy-1.1.1.dmg`.
 2. Open it and drag **BoseBuddy** to **Applications**.
 3. Open it once past Gatekeeper:
    - **Right-click BoseBuddy -> Open -> Open** in Applications, or
@@ -43,23 +31,17 @@ That is expected, not a damaged download.
      ```
    **Do not click "Move to Trash."**
 4. Allow Bluetooth when macOS asks (one time per install).
-5. Connect the headphones to this Mac:
-   - Put them in pairing mode if they are not paired with macOS yet (hold the
-     Bluetooth button until the light blinks).
-   - Connect them in **System Settings -> Bluetooth**.
-   - Open BoseBuddy and click **Connect**.
+5. Connect the headphones to this Mac in **System Settings -> Bluetooth**.
+6. Open BoseBuddy and click **Connect**.
 
 Full walkthrough: `INSTALL.md` in the repository.
 
 ## Notes
 
-- The headphones support two audio devices at once. The Mac must be one of
-  them; the other slot is free for your phone or tablet.
-- If both slots are taken by other devices, disconnect one or use the
-  headphones' Bluetooth button to switch.
-- The iPhone Bose app can hold one of the two audio connections. If the Mac
-  cannot connect, disconnect the phone or use the headphones' button.
+- The Mac must be connected to the headphones; BoseBuddy does not create a
+  connection on its own.
+- The headphones support two audio devices at once. If both slots are taken by
+  other devices, disconnect one before connecting the Mac.
 - Diagnostics: `~/Library/Logs/BoseBuddy.log`.
 
-MIT licensed. Protocol work builds on bosectl, Quiet Rebellion, and
-Gadgetbridge.
+MIT licensed.
