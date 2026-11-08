@@ -31,9 +31,9 @@ restart.
 
 - Paired-device list with green connected indicators and an active-audio marker.
 - **Connect / Disconnect / Switch** any device, including *This Mac*.
-- **Switch chooser**: when 2 of 2 audio slots are in use, pick which device to
-  disconnect. On by default. If turned off, the non-Mac device is dropped
-  automatically.
+- **Automatic switching**: when both audio slots are in use, the non-Mac device
+  is disconnected so the Mac keeps its connection. Turn on **Ask which device
+  to disconnect** in the gear menu to choose instead.
 - Mac audio on demand: **Connect audio** on the *This Mac* row.
 - Battery and charging state.
 - Noise-control modes (Quiet / Aware / custom).
@@ -47,7 +47,7 @@ restart.
 
 ### From a release (recommended)
 
-1. Download **`BoseBuddy-1.1.2.dmg`** from the
+1. Download **`BoseBuddy-1.1.3.dmg`** from the
    [Releases](../../releases) page.
 2. Open the DMG and drag **BoseBuddy** to **Applications**. Eject the DMG.
 3. **The first launch is blocked by Gatekeeper.** BoseBuddy is ad-hoc signed
@@ -150,9 +150,9 @@ Connected to: Mac + iPhone
   <img src="docs/switch.png" width="360" alt="Choose which device to disconnect">
 </p>
 
-The **Switch chooser** is on by default. If you turn off
-**Ask which device to disconnect** in the gear menu, the non-Mac device is
-disconnected automatically, and the panel says so.
+By default, switching disconnects the **non-Mac** device automatically. Turn on
+**Ask which device to disconnect** in the gear menu to choose which device to
+drop instead.
 
 ### Menu bar
 

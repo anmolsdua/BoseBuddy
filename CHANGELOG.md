@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.3 — 2026-11-08
+
+- Switching now defaults to disconnecting the **non-Mac** device, so the Mac
+  keeps its connection without a prompt.
+- The device chooser is opt-in: turn on **Ask which device to disconnect** in
+  the gear menu to pick which device to drop.
+
 ## 1.1.2 — 2026-11-08
 
 - BoseBuddy now recognizes a Mac that macOS already shows connected, even when

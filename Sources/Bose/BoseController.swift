@@ -92,7 +92,7 @@ final class BoseController: ObservableObject {
 
     init() {
         showBatteryInMenuBar = UserDefaults.standard.object(forKey: Self.batteryMenuBarKey) as? Bool ?? true
-        confirmBeforeSwitch = UserDefaults.standard.object(forKey: Self.confirmSwitchKey) as? Bool ?? true
+        confirmBeforeSwitch = UserDefaults.standard.object(forKey: Self.confirmSwitchKey) as? Bool ?? false
         launchAtLogin = SMAppService.mainApp.status == .enabled
 
         audioMonitor.onChange = { [weak self] available in

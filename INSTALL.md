@@ -9,7 +9,7 @@ later launches are normal.
 
 ## 1. Put BoseBuddy in Applications
 
-1. Download **`BoseBuddy-1.1.2.dmg`** from the Releases page.
+1. Download **`BoseBuddy-1.1.3.dmg`** from the Releases page.
 2. Open the DMG.
 3. Drag **BoseBuddy** into the **Applications** folder.
 4. Eject the DMG.
