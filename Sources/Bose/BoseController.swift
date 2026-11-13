@@ -153,7 +153,8 @@ final class BoseController: ObservableObject {
     nonisolated private static func pairedHeadphones() -> [Headphones] {
         let devices = (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? []
         let found: [Headphones] = devices.compactMap { device -> Headphones? in
-            guard let rawName = device.name, Self.looksLikeBose(rawName) else { return nil }
+            guard DeviceIdentity.isBose(device) else { return nil }
+            let rawName = device.name ?? "Bose headphones"
             return Headphones(
                 address: ByteCodec.canonicalMAC(device.addressString),
                 name: Self.friendlyName(rawName),
@@ -214,6 +215,8 @@ final class BoseController: ObservableObject {
     private func openClassic(address: String) async {
         let pairedName = headphones.first(where: { $0.address == address })?.name ?? ""
         if !pairedName.isEmpty { deviceName = Self.friendlyName(pairedName) }
+        audioMonitor.nameHint = pairedName.isEmpty ? "bose" : pairedName
+        audioAvailable = audioMonitor.refresh()
         let newLink = RFCOMMLink()
         do {
             let channel = try await newLink.open(
@@ -237,7 +240,6 @@ final class BoseController: ObservableObject {
                 let clean = Self.friendlyName(name)
                 productName = clean
                 deviceName = clean
-                audioMonitor.nameHint = clean
             }
             firmware = (try? await readFirmware()) ?? ""
             await refresh(deep: true)
@@ -358,7 +360,7 @@ final class BoseController: ObservableObject {
     }
 
     func refreshAudioAvailability() {
-        audioMonitor.nameHint = deviceName.isEmpty ? "bose" : deviceName
+        audioMonitor.nameHint = audioNameHint
         let available = audioMonitor.refresh()
         if available != audioAvailable {
             audioAvailable = available
@@ -371,13 +373,13 @@ final class BoseController: ObservableObject {
     private func startWatchdog() {
         stopWatchdog()
         BarLog.write("watchdog started")
+        let nameHint = audioNameHint
         let source = DispatchSource.makeTimerSource(queue: watchdogQueue)
         source.schedule(deadline: .now() + 2, repeating: 2)
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            // CoreAudio enumeration is safe off the main thread. The hint is
-            // intentionally generic; Bose product names all contain "bose".
-            let available = AudioOutputMonitor.boseOutputExists(hint: "bose")
+            // Use the paired name: users can rename their headphones.
+            let available = AudioOutputMonitor.boseOutputExists(hint: nameHint)
             Task { @MainActor in
                 self.applyWatchdog(audio: available)
             }
@@ -969,13 +971,9 @@ final class BoseController: ObservableObject {
         return name.isEmpty ? "Bose headphones" : name
     }
 
-    nonisolated private static func looksLikeBose(_ name: String) -> Bool {
-        let lower = name.lowercased()
-        return lower.contains("bose")
-            || lower.contains("quietcomfort")
-            || lower.contains("qc35")
-            || lower.contains("qc45")
-            || lower.contains("qc ultra")
+    private var audioNameHint: String {
+        headphones.first(where: { $0.address == connectedAddress })?.name
+            ?? (deviceName.isEmpty ? "bose" : deviceName)
     }
 
     private static func channelCandidates(for name: String) -> [UInt8] {
