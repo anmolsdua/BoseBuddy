@@ -1,9 +1,10 @@
 # QC Buddy tray app
 
 Tauri 2 app: a tray icon and a flyout above it (`src/`, React), on top of
-[`../core`](../core) (all headset work). Status: M2, with the header (name,
-battery, connected devices) and the Noise control card. Devices and EQ cards
-come in M3/M4; the core already supports them.
+[`../core`](../core) (all headset work). Status: header (name, battery,
+devices holding audio), Devices card (connect / disconnect / switch,
+multipoint, pairing mode) and Noise control card (switching). Mode editing and
+the EQ card come in M4; the core already supports them.
 
 ## Run
 

@@ -57,10 +57,19 @@ export interface AppState {
   pairingMode: boolean;
   pcAudio: boolean;
   supportsModes: boolean;
+  supportsMultipoint: boolean;
+  supportsPeers: boolean;
+  peersLoaded: boolean;
+  pendingSwitch: PeerSwitch | null;
   busy: string | null;
   peerAction: string | null;
   actionNote: string | null;
   error: string | null;
+}
+
+export interface PeerSwitch {
+  target: Peer;
+  candidates: Peer[];
 }
 
 export type Command =
@@ -69,6 +78,13 @@ export type Command =
   | { type: "connect"; args: string | null }
   | { type: "refresh" }
   | { type: "setMode"; args: number }
+  | { type: "setMultipoint"; args: boolean }
+  | { type: "connectPeer"; args: string }
+  | { type: "disconnectPeer"; args: string }
+  | { type: "confirmSwitch"; args: { dropMac: string } }
+  | { type: "cancelSwitch" }
+  | { type: "enterPairingMode" }
+  | { type: "clearPairingMode" }
   | { type: "clearError" };
 
 export function ancLabel(mode: Mode): string {
@@ -76,10 +92,31 @@ export function ancLabel(mode: Mode): string {
   return `ANC ${10 - Math.min(10, Math.max(0, mode.rawCnc))}/10`;
 }
 
+/** Whether a device holds one of the headset's audio slots (same rule as the core). */
+export function holdsAudio(peer: Peer, state: AppState): boolean {
+  return peer.connected || (peer.isLocal && state.pcAudio);
+}
+
 /** "PC + iPhone": devices holding the headset's audio slots. */
 export function audioDevices(state: AppState): string {
   return state.peers
-    .filter((p) => p.connected || (p.isLocal && state.pcAudio))
-    .map((p) => (p.isLocal ? "PC" : p.name || p.mac))
+    .filter((p) => holdsAudio(p, state))
+    .map((p) => (p.isLocal ? "PC" : displayName(p)))
     .join(" + ");
+}
+
+export function displayName(peer: Peer): string {
+  return peer.isLocal ? "This PC" : peer.name || peer.mac;
+}
+
+export type PeerKind = "computer" | "phone" | "tablet" | "headphones";
+
+/** Icon choice, same rule as the core's Peer::kind. */
+export function peerKind(peer: Peer): PeerKind {
+  if (peer.isLocal) return "computer";
+  const name = peer.name.toLowerCase();
+  if (name.includes("ipad") || name.includes("pad")) return "tablet";
+  if (name.includes("iphone") || name.includes("phone") || name.includes("pixel")) return "phone";
+  if (peer.isBoseProduct) return "headphones";
+  return "computer";
 }

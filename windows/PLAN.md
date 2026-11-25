@@ -1,6 +1,6 @@
 # QC Buddy — Windows port plan
 
-Status: M0 and M1 done (core crate + `qcbuddy` CLI); M2 in progress (tray app in `windows/app`). Branch `feature/windows-port`.
+Status: M0–M2 done; M3 (Devices card) built, hardware checks pending. Tray app in `windows/app`. Branch `feature/windows-port`.
 
 ## Goal
 
@@ -101,8 +101,8 @@ captured test fixtures. The macOS app is unchanged.
 |---|---|---|
 | M0 | **Spike** (4–6 days) | Console app on the Windows test PC passes the M0 checklist below and answers the risks. |
 | M1 | Core ✅ | `controller`, `peers`, `modes`, `eq_presets`, `log` with unit tests ported from `Tests/*.swift` and the QC45 fixtures. Done: `windows/core`, 51 tests, `qcbuddy` CLI; all reads verified on the QC45. |
-| M2 | Tray + flyout | Tauri app shows live battery and modes in the mockup UI. |
-| M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. |
+| M2 | Tray + flyout ✅ | Tauri app shows live battery and modes in the mockup UI. Done: flyout, mode switching, battery digits on the tray icon. |
+| M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
 | M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). |

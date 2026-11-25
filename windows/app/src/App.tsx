@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ancLabel, audioDevices, type AppState, type Command, type Mode } from "./types";
-
-const send = (command: Command) => invoke("send", { command });
+import { HeadphonesIcon, send } from "./controls";
+import { DevicesCard } from "./DevicesCard";
+import { ancLabel, audioDevices, type AppState, type Mode } from "./types";
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -52,11 +52,30 @@ function Flyout({ state }: { state: AppState }) {
       )}
       <div className="divider" />
       <main className="cards">
-        {connected ? <NoiseCard state={state} /> : <ConnectCard state={state} />}
+        {connected ? (
+          <>
+            <DevicesCard state={state} />
+            <NoiseCard state={state} />
+          </>
+        ) : (
+          <ConnectCard state={state} />
+        )}
       </main>
       <div className="divider" />
       <footer>
-        <span className="muted">{connected && state.firmware ? `Firmware ${state.firmware}` : ""}</span>
+        {connected && state.supportsPeers && !state.pairingMode ? (
+          <button
+            type="button"
+            className="link-button"
+            disabled={state.busy === "pairing"}
+            title="Puts the headphones in pairing mode so a new device can find them"
+            onClick={() => send({ type: "enterPairingMode" })}
+          >
+            + Pair new device
+          </button>
+        ) : (
+          <span />
+        )}
         <button
           type="button"
           className="icon-button"
@@ -97,7 +116,9 @@ function Header({ state }: { state: AppState }) {
         <HeadphonesIcon />
       </div>
       <div className="title">
-        <div className="name">{state.deviceName}</div>
+        <div className="name" title={state.firmware ? `Firmware ${state.firmware}` : undefined}>
+          {state.deviceName}
+        </div>
         <div className="status">
           <span className={`dot ${dot}`} />
           {status}
@@ -157,15 +178,5 @@ function ConnectCard({ state }: { state: AppState }) {
         </button>
       )}
     </section>
-  );
-}
-
-function HeadphonesIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
-      <rect x="3" y="14" width="4" height="6" rx="1.5" />
-      <rect x="17" y="14" width="4" height="6" rx="1.5" />
-    </svg>
   );
 }
