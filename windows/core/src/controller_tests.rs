@@ -303,3 +303,21 @@ fn worker_serializes_commands_and_reports_state() {
     assert_eq!(headset.state().mode_index, 2);
     assert_eq!(seen.lock().unwrap().last().copied().flatten(), Some(2));
 }
+
+#[test]
+fn flyout_open_rereads_settings_changed_elsewhere() {
+    // Issue #5: EQ, sidetone and multipoint changed from another device
+    // stayed stale until a reconnect.
+    let (mut c, headset, _) = connected(FakeState::default());
+    {
+        let mut fake = headset.state();
+        fake.eq[0].2 = 4;
+        fake.eq[2].2 = -3;
+        fake.sidetone = 2;
+        fake.multipoint = false;
+    }
+    c.flyout_opened();
+    assert_eq!(c.state().eq_values(), [4, 0, -3]);
+    assert_eq!(c.state().sidetone, 2);
+    assert!(!c.state().multipoint);
+}

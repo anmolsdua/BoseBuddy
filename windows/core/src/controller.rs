@@ -229,6 +229,10 @@ impl Controller {
             // Modes can be added, edited or deleted from the Bose app.
             self.read_mode_index();
             self.load_modes();
+            // So can EQ, sidetone and multipoint (or BoseBuddy on another computer).
+            self.load_eq();
+            self.load_sidetone();
+            self.load_multipoint();
             self.log_health();
         } else if self.state.link != LinkState::Connecting
             && (self.state.headphones.iter().any(|h| h.connected)
