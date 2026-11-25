@@ -97,7 +97,8 @@ captured test fixtures. The macOS app is unchanged.
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
-| M6 | Ship | NSIS/MSI installer with WebView2 bootstrapper, code signing decision, GitHub release, README section. |
+| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). |
+| M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
 
 ## Risks to settle in M0
 
@@ -128,8 +129,48 @@ captured test fixtures. The macOS app is unchanged.
 ## Open questions
 
 - Contribute the Windows transport and the 4.x peer commands back to bosectl?
-- Code signing: buy a certificate, or ship unsigned with instructions like the
-  macOS DMG does?
+
+## Distribution
+
+### v1: GitHub Releases (M6)
+
+- **Installer:** Tauri's **NSIS `.exe`** (`QCBuddy_<version>_x64-setup.exe`),
+  per-user install (no admin), bundles the WebView2 bootstrapper for PCs
+  without it. No MSI for now.
+- **Where:** a GitHub release on this repo, alongside the macOS assets, with
+  SHA-256 checksums.
+- **Signing:** ship **unsigned** at first, like the macOS DMG. The release
+  notes and README explain SmartScreen's "Windows protected your PC" screen
+  (More info → Run anyway). Revisit with Azure Trusted Signing if the warning
+  hurts adoption.
+- **Updates:** Tauri updater plugin, reading a `latest.json` attached to the
+  GitHub release. It needs its own update-signing key (separate from code
+  signing); keep the private key out of the repo, in a GitHub Actions secret.
+- **Launch at login:** Tauri `autostart` plugin (registry Run key), fine
+  outside MSIX.
+- **Third-party notices:** ship `bose-bmap`'s MIT notice with the installer
+  and in the About screen.
+
+### Follow-up: Microsoft Store (M7)
+
+- **Package:** **MSIX**, which the Store signs, so Store users get no
+  SmartScreen warning and get automatic updates through the Store.
+- **Tauri doesn't build MSIX**; package the release build with Microsoft's MSIX
+  tooling (`makeappx` / MSIX Packaging Tool) in CI.
+- **MSIX changes the app:**
+  - Launch at login becomes a declared `StartupTask` instead of the registry
+    Run key (the Run key is virtualized inside MSIX).
+  - File writes under AppData are redirected, so read the log path from the
+    API at runtime rather than hard-coding it.
+  - Turn off the Tauri updater in the Store build; the Store updates the app.
+- **Listing:** "QC Buddy — works with Bose QuietComfort headphones", no Bose
+  logos or artwork; needs a Microsoft developer account, privacy statement
+  (no telemetry, logs stay local) and screenshots.
+- Check Microsoft's current Store, signing and account requirements before
+  starting M7; they change.
+
+Not planned: winget (can be added later as a manifest pointing at the GitHub
+release), standalone MSIX outside the Store.
 
 ## Name
 
