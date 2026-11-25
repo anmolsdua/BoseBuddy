@@ -731,6 +731,31 @@ final class BoseController: ObservableObject {
         }
     }
 
+    /// Current band values ordered by band ID, for matching against presets.
+    var eqValues: [Int] { eqBands.map(\.value) }
+
+    /// Apply a whole preset. Only bands that differ are written.
+    func applyEQ(_ values: [Int]) async {
+        guard linkState.isConnected, !eqBands.isEmpty else { return }
+        busyAction = "eq:preset"
+        defer { busyAction = nil }
+        do {
+            for (index, value) in zip(eqBands.indices, values) {
+                let band = eqBands[index]
+                let clamped = max(band.minimum, min(band.maximum, value))
+                guard clamped != band.value else { continue }
+                eqBands[index].value = clamped
+                let packets = try await exchange(1, 7, op: .setGet,
+                                                 payload: [UInt8(bitPattern: Int8(clamping: clamped)),
+                                                           UInt8(band.bandID)])
+                try ensureOK(packets, fblock: 1, function: 7)
+            }
+        } catch {
+            errorText = message(for: error)
+        }
+        await loadEQ()
+    }
+
     func setSidetone(_ level: Int) async {
         guard linkState.isConnected else { return }
         busyAction = "sidetone"

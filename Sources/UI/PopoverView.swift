@@ -21,6 +21,10 @@ struct PopoverView: View {
     @Environment(\.boseBarRenderMode) private var renderMode
 
     @State private var showEqualizer = false
+    @StateObject private var presets = EQPresetStore()
+    @State private var presetEditor: PresetEditor?
+    @State private var presetName = ""
+    @FocusState private var presetNameFocused: Bool
     @State private var confirmPowerOff = false
     @AppStorage("showUnnamedDevices") private var showUnnamedDevices = false
 
@@ -572,10 +576,16 @@ struct PopoverView: View {
         Card {
             DisclosureGroup(isExpanded: $showEqualizer) {
                 VStack(spacing: 10) {
+                    if model.supportsEQ {
+                        presetChips
+                    }
                     ForEach(model.eqBands) { band in
                         EQRow(band: band) { value in
                             Task { await model.setEQ(band: band, value: value) }
                         }
+                    }
+                    if model.supportsEQ {
+                        presetStatus
                     }
                     if model.supportsSidetone {
                         Divider().padding(.vertical, 2)
@@ -615,6 +625,122 @@ struct PopoverView: View {
             }
             .tint(.secondary)
         }
+    }
+
+    // MARK: - EQ presets
+
+    private var currentPreset: EQPreset? {
+        presets.preset(matching: model.eqValues)
+    }
+
+    private var presetChips: some View {
+        let selectedID = currentPreset?.id
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(presets.all) { preset in
+                    PresetChip(preset: preset, isSelected: preset.id == selectedID) {
+                        presetEditor = nil
+                        Task { await model.applyEQ(preset.values) }
+                    }
+                    .contextMenu {
+                        if !preset.isBuiltIn {
+                            Button("Rename…") { beginRename(preset) }
+                            Button("Delete", role: .destructive) { presets.delete(preset.id) }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .disabled(model.busyAction != nil)
+    }
+
+    /// Below the sliders: Save for unsaved values, Rename/Delete for a
+    /// selected custom preset, or the inline name editor.
+    @ViewBuilder
+    private var presetStatus: some View {
+        if let editor = presetEditor {
+            presetNameEditor(editor)
+        } else if let preset = currentPreset {
+            if !preset.isBuiltIn {
+                HStack(spacing: 10) {
+                    Text(preset.name)
+                        .font(.system(size: 11, weight: .medium))
+                    Spacer()
+                    Button("Rename") { beginRename(preset) }
+                    Button("Delete") { presets.delete(preset.id) }
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+            }
+        } else {
+            HStack(spacing: 4) {
+                Text("Custom")
+                    .foregroundStyle(.secondary)
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Button("Save as preset…") {
+                    presetName = ""
+                    presetEditor = .save
+                    presetNameFocused = true
+                }
+                .buttonStyle(.link)
+                Spacer()
+            }
+            .font(.system(size: 11))
+        }
+    }
+
+    private func presetNameEditor(_ editor: PresetEditor) -> some View {
+        let renamingID: String? = {
+            if case .rename(let id) = editor { return id }
+            return nil
+        }()
+        let canSave = presets.isNameAvailable(presetName, excluding: renamingID)
+        let commit = {
+            guard canSave else { return }
+            switch editor {
+            case .save: presets.save(name: presetName, values: model.eqValues)
+            case .rename(let id): presets.rename(id, to: presetName)
+            }
+            presetEditor = nil
+        }
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                TextField("Preset name", text: $presetName)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
+                    .focused($presetNameFocused)
+                    .onSubmit(commit)
+                    .onExitCommand { presetEditor = nil }
+                    .onChange(of: presetName) { _, newValue in
+                        if newValue.count > EQPreset.maxNameLength {
+                            presetName = String(newValue.prefix(EQPreset.maxNameLength))
+                        }
+                    }
+                Text("\(presetName.count)/\(EQPreset.maxNameLength)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Button("Cancel") { presetEditor = nil }
+                    .controlSize(.small)
+                Button(editor == .save ? "Save" : "Rename", action: commit)
+                    .controlSize(.small)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave)
+            }
+            if !canSave && !EQPreset.cleanName(presetName).isEmpty {
+                Text("A preset with this name already exists.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func beginRename(_ preset: EQPreset) {
+        presetName = preset.name
+        presetEditor = .rename(preset.id)
+        presetNameFocused = true
     }
 
     // MARK: - Empty state
@@ -774,6 +900,41 @@ private struct SectionTitle: View {
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
             .kerning(0.4)
+    }
+}
+
+private enum PresetEditor: Equatable {
+    case save
+    case rename(String)
+}
+
+private struct PresetChip: View {
+    let preset: EQPreset
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                if !preset.isBuiltIn {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 8))
+                }
+                Text(preset.name)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .background(
+                Capsule().fill(isSelected ? Theme.accent : Color.primary.opacity(0.07))
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(preset.values.map { $0 > 0 ? "+\($0)" : "\($0)" }.joined(separator: " / "))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
