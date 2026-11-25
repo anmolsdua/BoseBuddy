@@ -149,6 +149,10 @@ final class BoseController: ObservableObject {
                 // Modes can be added, edited or deleted from the Bose app.
                 await readModeIndex()
                 await loadModes()
+                // So can EQ, sidetone and multipoint (or another QC Buddy / BoseBuddy).
+                await loadEQ()
+                await loadSidetone()
+                await loadMultipoint()
                 logHealth()
             }
         } else if linkState != .connecting,
