@@ -1,6 +1,6 @@
 [package]
 name = "qcbuddy"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 publish = false
 description = "QC Buddy: control Bose QuietComfort headphones from the Windows tray"
@@ -15,6 +15,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.61"

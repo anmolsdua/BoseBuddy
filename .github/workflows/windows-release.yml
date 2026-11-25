@@ -1,8 +1,10 @@
 name: Windows release
 
-# Push a tag like qcbuddy-v0.1.0 (matching windows/app/src-tauri/tauri.conf.json)
-# to build the QC Buddy installer and attach it to a draft GitHub release.
-# Nothing is public until the draft is published by hand.
+# Push a tag like qcbuddy-v0.1.2 (matching windows/app/src-tauri/tauri.conf.json)
+# to build the QC Buddy installer, sign it for the updater, and attach it to a
+# draft GitHub release with latest-windows.json. Nothing is public, and no
+# installed copy is offered the update, until the draft is published by hand
+# (windows-publish-update.yml then updates the feed).
 
 on:
   push:
@@ -19,6 +21,11 @@ env:
 jobs:
   release:
     runs-on: windows-latest
+    env:
+      # The updater signing key (tauri signer generate). Installed copies only
+      # accept updates signed with it; keep an offline copy.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -33,6 +40,13 @@ jobs:
             windows/core
             windows/app/src-tauri
           key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+
+      - name: Updater signing key is set
+        shell: pwsh
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or -not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+            throw "Set the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets (see windows/RELEASING.md)."
+          }
 
       - name: Tag matches the app version
         id: version
@@ -61,16 +75,27 @@ jobs:
           npm ci
           npm test
 
-      - name: Build the installer
+      - name: Build and sign the installer
         working-directory: windows/app
-        run: npm run tauri build
+        # tauri.release.conf.json adds createUpdaterArtifacts: the .sig file.
+        run: npx tauri build --config src-tauri/tauri.release.conf.json
 
       - name: Name it and checksum it
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
+          $built = "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${version}_x64-setup.exe"
+          $name = "QCBuddy_${version}_x64-setup.exe"
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe"
+          Copy-Item $built "dist/$name"
+          Copy-Item "$built.sig" "dist/$name.sig"
+          # The update feed for this version; the publish workflow copies it to qcbuddy-latest.
+          node windows/app/scripts/update-feed.mjs `
+            --version $version `
+            --sig "dist/$name.sig" `
+            --url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$name" `
+            --notes "QC Buddy $version. Release notes: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" `
+            --out dist/latest-windows.json
           Push-Location dist
           Get-ChildItem *.exe | ForEach-Object {
             "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
@@ -88,4 +113,5 @@ jobs:
             --draft --prerelease `
             --title "QC Buddy $version (Windows)" `
             --notes-file windows/RELEASE_NOTES.md `
-            "dist/QCBuddy_${version}_x64-setup.exe" dist/SHA256SUMS.txt
+            "dist/QCBuddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe.sig" `
+            dist/latest-windows.json dist/SHA256SUMS.txt

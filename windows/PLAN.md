@@ -118,7 +118,7 @@ captured test fixtures. The macOS app is unchanged.
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. Built (UI + core; presets shared with the CLI in `eq-presets.json`); editing still to be checked on hardware. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
-| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a pre-release from a `qcbuddy-v<version>` tag (version check, tests, installer, SHA-256); `RELEASE_NOTES.md`; README section. Auto-updater not yet. |
+| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a signed pre-release from a `qcbuddy-v<version>` tag; auto-update from 0.1.2 (feed per platform, published by `windows-publish-update.yml`); see [`RELEASING.md`](RELEASING.md). |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
 
 ## M0 checklist
@@ -229,9 +229,12 @@ Findings:
   notes and README explain SmartScreen's "Windows protected your PC" screen
   (More info → Run anyway). Revisit with Azure Trusted Signing if the warning
   hurts adoption.
-- **Updates:** Tauri updater plugin, reading a `latest.json` attached to the
-  GitHub release. It needs its own update-signing key (separate from code
-  signing); keep the private key out of the repo, in a GitHub Actions secret.
+- **Updates (from 0.1.2):** Tauri updater plugin. Installed copies read
+  `qcbuddy-latest/latest-{{target}}.json` (one feed per platform, so a
+  future macOS build can release separately); the feed is updated only when
+  a release is published. Updates are signed with QC Buddy's own key (not
+  code signing), kept out of the repo in GitHub secrets. See
+  [`RELEASING.md`](RELEASING.md).
 - **Launch at login:** Tauri `autostart` plugin (registry Run key), fine
   outside MSIX.
 - **Third-party notices:** credit bosectl (MIT) for the QC45 mode layout in

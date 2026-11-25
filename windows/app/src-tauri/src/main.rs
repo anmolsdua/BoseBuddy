@@ -22,6 +22,7 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewW
 
 mod presets;
 mod snapshot;
+mod updates;
 
 use snapshot::{Latest, Snapshot};
 
@@ -103,10 +104,43 @@ fn delete_preset(id: String) -> Vec<EqPreset> {
     presets::delete(&presets_path(), &id)
 }
 
+/// Whether an update is available, downloading or installing.
+#[tauri::command]
+fn update_status(updates: tauri::State<'_, updates::Updates>) -> updates::UpdateStatus {
+    updates.status()
+}
+
+/// "Try again" after a failed manual check.
+#[tauri::command]
+fn check_for_updates(app: AppHandle) {
+    updates::check_now(app);
+}
+
+/// Dismiss "up to date" or a failure message.
+#[tauri::command]
+fn dismiss_update_status(app: AppHandle, updates: tauri::State<'_, updates::Updates>) {
+    updates.dismiss(&app);
+}
+
+/// "Install and restart": download, verify, install, restart.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    updates::install(app).await
+}
+
 fn main() {
     tauri::Builder::default()
         // Must be first: a second launch just opens the running app's flyout.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app)))
+        // Must be first: a second launch opens the running copy's flyout, and
+        // `QCBuddy.exe --check-for-updates` makes the running copy check now.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            show(app);
+            if updates::wants_check(&args) {
+                updates::check_now(app.clone());
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
             get_state,
             send,
@@ -115,7 +149,11 @@ fn main() {
             presets,
             save_preset,
             rename_preset,
-            delete_preset
+            delete_preset,
+            update_status,
+            install_update,
+            check_for_updates,
+            dismiss_update_status
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -133,6 +171,12 @@ fn main() {
             });
 
             build_tray(&handle)?;
+            updates::start(handle.clone());
+            // Started with --check-for-updates (no copy was running): check and show the flyout.
+            if updates::wants_check(&std::env::args().collect::<Vec<_>>()) {
+                show(&handle);
+                updates::check_now(handle.clone());
+            }
             watch_taskbar_theme(handle.clone());
             if let Some(window) = handle.get_webview_window(FLYOUT) {
                 let app = handle.clone();
@@ -303,8 +347,9 @@ fn tooltip(state: &State) -> String {
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open QC Buddy", true, None::<&str>)?;
+    let check = MenuItem::with_id(app, "check-updates", "Check for updates", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &check, &quit])?;
     let light = app.state::<AppState>().light_taskbar.load(Ordering::SeqCst);
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon(None, light))
@@ -313,6 +358,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
+            "check-updates" => {
+                show(app);
+                updates::check_now(app.clone());
+            }
             "quit" => app.exit(0),
             _ => {}
         })

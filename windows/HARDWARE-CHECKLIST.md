@@ -81,3 +81,7 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 30 | Uninstall (Settings → Apps) removes the app and keeps the log and EQ presets in `%LOCALAPPDATA%\QC Buddy` | | 2026-11-25 (silent uninstall) |
 | 31 | Installing a newer version over the old one keeps presets and the tray icon position | | |
 | 32 | `SHA256SUMS.txt` matches the download | `Get-FileHash` | |
+| 33 | Release build signs the installer (`.sig` next to it) | Local `tauri build --config src-tauri/tauri.release.conf.json` with the key | 2026-11-25 |
+| 34 | Update offered: an older installed version shows "QC Buddy x.y.z is available" within ~10 s of starting, after the newer release is published | Install the previous release, publish the new one | |
+| 35 | Install and restart: downloads, verifies, installs passively, restarts on the new version; presets and log kept | Click the banner | |
+| 36 | A plain-http feed is refused | `QCBUDDY_UPDATE_URL=http://…` | 2026-11-25 |
