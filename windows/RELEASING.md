@@ -22,22 +22,32 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
 1. Bump the version in `app/src-tauri/tauri.conf.json`, `app/package.json`
    (`npm version x.y.z --no-git-tag-version`), `app/src-tauri/Cargo.toml` and
    `core/Cargo.toml`; add a `## X.Y.Z` section to `CHANGELOG.md` with only
-   what changed since the last release. Merge to `main` via a pull request.
+   what changed since the last release. Open a pull request from a
+   branch starting with `release/qcbuddy` (for example,
+   `release/qcbuddy-v0.1.3`) in this repository into `main`.
    The release page shows that section plus a short install footer
    (`app/scripts/release-notes.mjs`); the release fails early if the section
    is missing.
-2. Tag the merge commit on `main`: `git tag -a qcbuddy-vX.Y.Z -m "QC Buddy X.Y.Z (Windows)"`
-   and push the tag. `windows-release.yml` checks the versions, runs the
-   tests, builds and signs the installer, and creates a **draft**
-   pre-release with:
+2. Merge the PR. `windows-release.yml` checks the versions, runs the tests,
+   builds and signs the installer, tags the exact merge commit as
+   `qcbuddy-vX.Y.Z`, and creates a **draft** pre-release with:
    - `QCBuddy_X.Y.Z_x64-setup.exe` and its `.sig`
    - `latest-windows.json` (the update feed entry for this version)
    - `SHA256SUMS.txt`
+   The tag version comes from `tauri.conf.json`, not the branch name.
+   Closed-but-unmerged PRs and other source branches do not release.
+   An existing tag is never moved: it must point to the same commit or
+   the workflow fails. No extra token is needed; tagging and release
+   creation happen in the same run.
 3. Download the installer from the draft and check it (`HARDWARE-CHECKLIST.md`,
    install and update rows).
 4. **Publish** the draft. `windows-publish-update.yml` copies its
    `latest-windows.json` to the permanent `qcbuddy-latest` release; installed
    copies are offered the update at their next check (at most 6 hours).
+## Manual release fallback
+Tag the intended commit with
+`git tag -a qcbuddy-vX.Y.Z -m "QC Buddy X.Y.Z (Windows)"` and push that
+tag. Tag pushes still run the same release workflow.
 
 ## The update feed
 
