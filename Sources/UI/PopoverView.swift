@@ -574,7 +574,30 @@ struct PopoverView: View {
 
     private var equalizerCard: some View {
         Card {
-            DisclosureGroup(isExpanded: $showEqualizer) {
+            // Custom header instead of DisclosureGroup so it matches the
+            // Noise control card: same title style, value pinned right.
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { showEqualizer.toggle() }
+            } label: {
+                HStack(spacing: 5) {
+                    SectionTitle("Equalizer")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(showEqualizer ? 90 : 0))
+                    Spacer()
+                    if model.busyAction?.hasPrefix("eq") == true {
+                        ProgressView().controlSize(.mini)
+                    }
+                    if model.supportsEQ, !model.eqBands.isEmpty {
+                        presetBadge
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showEqualizer {
                 VStack(spacing: 10) {
                     if model.supportsEQ {
                         presetChips
@@ -609,26 +632,8 @@ struct PopoverView: View {
                         }
                     }
                 }
-                .padding(.top, 10)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11))
-                    Text("Equalizer")
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    if model.busyAction?.hasPrefix("eq") == true {
-                        ProgressView().controlSize(.mini)
-                    }
-                    if model.supportsEQ, !model.eqBands.isEmpty {
-                        // Visible while collapsed, so the current sound is
-                        // clear without opening the card.
-                        presetBadge
-                    }
-                }
-                .foregroundStyle(.primary)
+                .padding(.top, 2)
             }
-            .tint(.secondary)
         }
     }
 
@@ -668,10 +673,10 @@ struct PopoverView: View {
                     .font(.system(size: 8))
             }
             Text(preset?.name ?? "Custom")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium, design: .rounded))
                 .lineLimit(1)
         }
-        .foregroundStyle(preset == nil ? Color.secondary : Theme.accent)
+        .foregroundStyle(preset == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Theme.accent))
     }
 
     /// Below the sliders: Save for unsaved values, Rename/Delete for a
