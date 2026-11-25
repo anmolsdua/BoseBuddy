@@ -684,8 +684,10 @@ final class BoseController: ObservableObject {
         let previous = modeIndex
         modeIndex = index
         do {
+            // Second byte asks the headphones to play the mode prompt, matching
+            // what the physical Action button does.
             let packets = try await exchange(31, 3, op: .start,
-                                             payload: [UInt8(index), 0], timeout: 3.0)
+                                             payload: [UInt8(index), 1], timeout: 3.0)
             try ensureOK(packets, fblock: 31, function: 3)
             try await Task.sleep(nanoseconds: 250_000_000)
             await readModeIndex()
