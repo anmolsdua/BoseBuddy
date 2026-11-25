@@ -1,0 +1,85 @@
+name: Windows release
+
+# Push a tag like qcbuddy-v0.1.0 (matching windows/app/src-tauri/tauri.conf.json)
+# to build the QC Buddy installer and attach it to a draft GitHub release.
+# Nothing is public until the draft is published by hand.
+
+on:
+  push:
+    tags: ["qcbuddy-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+
+      - name: Tag matches the app version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content windows/app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ("${{ github.ref_name }}" -ne "qcbuddy-v$version") {
+            throw "Tag ${{ github.ref_name }} doesn't match tauri.conf.json version $version"
+          }
+          foreach ($file in "windows/app/package.json") {
+            $v = (Get-Content $file -Raw | ConvertFrom-Json).version
+            if ($v -ne $version) { throw "$file has version $v, expected $version" }
+          }
+          foreach ($file in "windows/app/src-tauri/Cargo.toml", "windows/core/Cargo.toml") {
+            if (-not (Select-String -Path $file -Pattern "^version = `"$version`"" -Quiet)) { throw "$file isn't version $version" }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Core tests
+        working-directory: windows/core
+        run: cargo test
+
+      - name: UI tests
+        working-directory: windows/app
+        run: |
+          npm ci
+          npm test
+
+      - name: Build the installer
+        working-directory: windows/app
+        run: npm run tauri build
+
+      - name: Name it and checksum it
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe"
+          Push-Location dist
+          Get-ChildItem *.exe | ForEach-Object {
+            "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          Pop-Location
+
+      - name: Draft the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          gh release create "${{ github.ref_name }}" `
+            --draft --prerelease `
+            --title "QC Buddy $version (Windows)" `
+            --notes-file windows/RELEASE_NOTES.md `
+            "dist/QCBuddy_${version}_x64-setup.exe" dist/SHA256SUMS.txt

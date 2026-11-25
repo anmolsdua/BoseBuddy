@@ -1,6 +1,6 @@
 # QC Buddy — Windows port plan
 
-Status: M0–M2 done; M3 and M4 built (Devices, mode editing, EQ, sidetone), hardware checks pending. Next: M5. Tray app in `windows/app`. Branch `feature/windows-port`.
+Status: M0–M2 done; M3 and M4 built (hardware checks pending); M6 release pipeline built (M5 polish deferred). Tray app in `windows/app`. Branch `feature/windows-port`.
 
 ## Goal
 
@@ -118,7 +118,7 @@ captured test fixtures. The macOS app is unchanged.
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. Built (UI + core; presets shared with the CLI in `eq-presets.json`); editing still to be checked on hardware. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
-| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). |
+| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a pre-release from a `qcbuddy-v<version>` tag (version check, tests, installer, SHA-256); `RELEASE_NOTES.md`; README section. Auto-updater not yet. |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
 
 ## M0 checklist

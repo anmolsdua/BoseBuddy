@@ -19,6 +19,15 @@ battery.
   <img src="docs/popover.png" width="360" alt="BoseBuddy menu bar panel">
 </p>
 
+## Windows: QC Buddy
+
+**QC Buddy** is the Windows version: a tray app with the same features,
+built from the same protocol code. Download `QCBuddy_<version>_x64-setup.exe`
+from the [QC Buddy releases](https://github.com/hu13/BoseBuddy/releases?q=qcbuddy).
+It isn't code-signed yet, so on first run Windows SmartScreen shows "Windows
+protected your PC": click **More info**, then **Run anyway**. Source, build
+steps and status are in [`windows/`](windows/PLAN.md).
+
 ## Why
 
 The Bose app is the only official place to manage the headphones’ paired

@@ -71,3 +71,13 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 25 | Light and dark taskbar: icon visible in both | Settings → Personalization → Colors | |
 | 26 | 125% / 150% display scaling: flyout placed and sized right | Settings → Display | |
 | 27 | Second launch opens the running app's flyout | Start the app again | 2026-11-25 |
+
+## Install and release
+
+| # | Check | How | Last pass |
+|---|---|---|---|
+| 28 | Installer installs per user, no admin prompt; Start menu entry; app starts from it | Run `QCBuddy_<version>_x64-setup.exe` | 2026-11-25 (silent install of a local build) |
+| 29 | Downloaded installer: SmartScreen shows More info → Run anyway, as the release notes say | Download from the release page (local builds have no download mark) | |
+| 30 | Uninstall (Settings → Apps) removes the app and keeps the log and EQ presets in `%LOCALAPPDATA%\QC Buddy` | | 2026-11-25 (silent uninstall) |
+| 31 | Installing a newer version over the old one keeps presets and the tray icon position | | |
+| 32 | `SHA256SUMS.txt` matches the download | `Get-FileHash` | |
