@@ -48,8 +48,6 @@ impl Default for Timing {
 #[serde(tag = "type", content = "args", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Command {
     Start,
-    FlyoutOpened,
-    FlyoutClosed,
     Connect(Option<String>),
     Disconnect,
     Refresh,
@@ -71,6 +69,9 @@ pub enum Command {
     ClearError,
     PowerOff,
     Shutdown,
+    /// Internal: wakes an idle worker to look at the flyout flag. Not from the UI.
+    #[serde(skip)]
+    Wake,
 }
 
 /// Commands waiting at most; beyond this `send` says the worker is busy
@@ -102,6 +103,9 @@ impl std::error::Error for SendError {}
 pub struct Worker {
     tx: SyncSender<Command>,
     stop: Arc<AtomicBool>,
+    /// Whether the flyout is open. A flag, not a queued command, so it can't
+    /// be lost when the queue is full: the worker reads it before each step.
+    flyout: Arc<AtomicBool>,
     // In a Mutex so the Worker is Sync (the app shares it across threads).
     done: Mutex<Receiver<()>>,
     handle: Option<JoinHandle<()>>,
@@ -121,6 +125,8 @@ impl Worker {
         let (done_tx, done) = mpsc::channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
+        let flyout = Arc::new(AtomicBool::new(false));
+        let flyout_flag = flyout.clone();
         let progress = on_state.clone();
         controller.set_on_change(move |state| progress(state));
         let handle = std::thread::Builder::new()
@@ -131,41 +137,47 @@ impl Worker {
                 let mut next_tick = Instant::now() + timing.tick;
                 let mut ticks: u32 = 0;
                 loop {
-                    let deadline = if flyout_open { next_poll } else { next_tick };
-                    let command = match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
-                        Ok(command) => Some(command),
-                        Err(RecvTimeoutError::Timeout) => None,
-                        Err(RecvTimeoutError::Disconnected) => break,
+                    // The flyout opened or closed: act on that before anything
+                    // queued, so polling always follows what the user sees.
+                    let wanted = flyout_flag.load(Ordering::SeqCst);
+                    let step = if wanted != flyout_open {
+                        flyout_open = wanted;
+                        if wanted {
+                            next_poll = Instant::now() + timing.poll;
+                            Step::Opened
+                        } else {
+                            next_tick = Instant::now() + timing.tick;
+                            Step::Closed
+                        }
+                    } else {
+                        let deadline = if flyout_open { next_poll } else { next_tick };
+                        match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+                            Ok(command) => Step::Command(command),
+                            Err(RecvTimeoutError::Timeout) => Step::Timer,
+                            Err(RecvTimeoutError::Disconnected) => break,
+                        }
                     };
                     // Quitting: don't start anything still queued.
-                    if stopping.load(Ordering::SeqCst) || command == Some(Command::Shutdown) {
+                    if stopping.load(Ordering::SeqCst) || step == Step::Command(Command::Shutdown) {
                         break;
                     }
-                    let label = command.as_ref().map(|c| format!("{c:?}")).unwrap_or_else(|| "poll".into());
-                    let outcome = catch_unwind(AssertUnwindSafe(|| match command {
-                        None if flyout_open => {
+                    let label = match &step {
+                        Step::Command(c) => format!("{c:?}"),
+                        other => format!("{other:?}"),
+                    };
+                    let outcome = catch_unwind(AssertUnwindSafe(|| match step {
+                        Step::Opened => controller.flyout_opened(),
+                        Step::Closed => controller.flyout_closed(),
+                        Step::Timer if flyout_open => {
                             controller.poll();
                             next_poll = Instant::now() + timing.poll;
                         }
-                        None => {
+                        Step::Timer => {
                             ticks += 1;
                             controller.background_tick(ticks.is_multiple_of(timing.battery_every));
                             next_tick = Instant::now() + timing.tick;
                         }
-                        Some(command) => {
-                            match &command {
-                                Command::FlyoutOpened => {
-                                    flyout_open = true;
-                                    next_poll = Instant::now() + timing.poll;
-                                }
-                                Command::FlyoutClosed => {
-                                    flyout_open = false;
-                                    next_tick = Instant::now() + timing.tick;
-                                }
-                                _ => {}
-                            }
-                            run(&mut controller, command);
-                        }
+                        Step::Command(command) => run(&mut controller, command),
                     }));
                     if let Err(panic) = outcome {
                         // A bug in one action mustn't take the app's headset connection down.
@@ -181,7 +193,16 @@ impl Worker {
                 let _ = done_tx.send(());
             })
             .expect("spawn controller thread");
-        Worker { tx, stop, done: Mutex::new(done), handle: Some(handle) }
+        Worker { tx, stop, flyout, done: Mutex::new(done), handle: Some(handle) }
+    }
+
+    /// The flyout opened (refresh now, poll every 15 s) or closed (back to
+    /// the background tick). Never lost: if the queue is full the worker is
+    /// busy and picks the flag up before its next command.
+    pub fn set_flyout_open(&self, open: bool) {
+        self.flyout.store(open, Ordering::SeqCst);
+        // Wake an idle worker now; a full queue means it's busy and will look anyway.
+        let _ = self.tx.try_send(Command::Wake);
     }
 
     /// Queue a command. Fails right away (never blocks the UI) when the
@@ -210,12 +231,19 @@ impl Drop for Worker {
     }
 }
 
+/// One turn of the worker loop.
+#[derive(Debug, PartialEq)]
+enum Step {
+    Opened,
+    Closed,
+    Command(Command),
+    Timer,
+}
+
 /// Apply one command to the controller.
 pub fn run(c: &mut Controller, command: Command) {
     match command {
         Command::Start => c.start(),
-        Command::FlyoutOpened => c.flyout_opened(),
-        Command::FlyoutClosed => c.flyout_closed(),
         Command::Connect(address) => c.connect(address.as_deref()),
         Command::Disconnect => c.disconnect(),
         Command::Refresh => c.refresh(true),
@@ -236,7 +264,7 @@ pub fn run(c: &mut Controller, command: Command) {
         Command::SetAskBeforeSwitch(ask) => c.set_ask_before_switch(ask),
         Command::ClearError => c.clear_error(),
         Command::PowerOff => c.power_off(),
-        Command::Shutdown => {}
+        Command::Shutdown | Command::Wake => {}
     }
 }
 
@@ -247,7 +275,8 @@ mod tests {
     #[test]
     fn commands_from_ui_json() {
         let parse = |json: &str| serde_json::from_str::<Command>(json).unwrap();
-        assert_eq!(parse(r#"{"type":"flyoutOpened"}"#), Command::FlyoutOpened);
+        assert_eq!(parse(r#"{"type":"refresh"}"#), Command::Refresh);
+        assert!(serde_json::from_str::<Command>(r#"{"type":"wake"}"#).is_err(), "internal only");
         assert_eq!(parse(r#"{"type":"setMode","args":2}"#), Command::SetMode(2));
         assert_eq!(
             parse(r#"{"type":"updateMode","args":{"index":2,"rawCnc":4,"windBlock":false}}"#),

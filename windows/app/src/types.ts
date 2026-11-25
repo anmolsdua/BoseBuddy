@@ -81,8 +81,6 @@ export interface PeerSwitch {
 }
 
 export type Command =
-  | { type: "flyoutOpened" }
-  | { type: "flyoutClosed" }
   | { type: "connect"; args: string | null }
   | { type: "refresh" }
   | { type: "setMode"; args: number }

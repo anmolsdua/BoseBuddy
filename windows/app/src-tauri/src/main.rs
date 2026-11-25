@@ -296,8 +296,7 @@ fn show(app: &AppHandle) {
     place(&window);
     let _ = window.show();
     let _ = window.set_focus();
-    // If the worker is busy the flyout shows the last state; it updates when the queue drains.
-    let _ = app.state::<AppState>().worker.send(Command::FlyoutOpened);
+    app.state::<AppState>().worker.set_flyout_open(true);
 }
 
 fn hide(app: &AppHandle) {
@@ -310,7 +309,7 @@ fn hide(app: &AppHandle) {
     if let Ok(mut hidden_at) = state.hidden_at.lock() {
         *hidden_at = Some(Instant::now());
     }
-    let _ = state.worker.send(Command::FlyoutClosed);
+    state.worker.set_flyout_open(false);
 }
 
 /// Bottom-right of the work area of the monitor under the cursor (where the

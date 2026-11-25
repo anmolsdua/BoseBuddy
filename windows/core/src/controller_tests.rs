@@ -538,12 +538,12 @@ fn worker_polls_while_open_and_ticks_while_closed() {
     let timing = Timing { poll: Duration::from_millis(20), tick: Duration::from_millis(20), battery_every: 2 };
     let worker = Worker::spawn_with(Controller::new(Box::new(headset.clone()), Log::memory()), timing, |_| {});
     worker.send(Command::Start).unwrap();
-    worker.send(Command::FlyoutOpened).unwrap();
+    worker.set_flyout_open(true);
     std::thread::sleep(Duration::from_millis(150));
     let open_polls = headset.state().request_log().iter().filter(|l| *l == "31.3 get").count();
     assert!(open_polls >= 3, "polls mode while open: {open_polls}");
 
-    worker.send(Command::FlyoutClosed).unwrap();
+    worker.set_flyout_open(false);
     std::thread::sleep(Duration::from_millis(30));
     headset.state().requests.clear();
     std::thread::sleep(Duration::from_millis(150));
@@ -820,4 +820,38 @@ fn a_refused_channel_still_tries_the_next() {
     c.start();
     assert_eq!(headset.state().connect_attempts, [8, 2]);
     assert_eq!(c.state().channel, 2);
+}
+
+#[test]
+fn opening_and_closing_the_flyout_isnt_lost_when_the_queue_is_full() {
+    use crate::worker::{SendError, Timing};
+    use std::time::Duration;
+    let headset = FakeHeadset::new(FakeState { delay: Duration::from_millis(20), ..FakeState::default() });
+    let timing = Timing { poll: Duration::from_millis(40), tick: Duration::from_secs(60), battery_every: 5 };
+    let worker = Worker::spawn_with(Controller::new(Box::new(headset.clone()), Log::memory()), timing, |_| {});
+    let count = |what: &str| headset.state().request_log().iter().filter(|l| *l == what).count();
+    worker.send(Command::Start).unwrap();
+    wait_for(|| count("1.7 get") > 0); // Start has finished (EQ is read last)
+
+    // Fill the queue with slow writes; returns how many were accepted.
+    let fill = || {
+        let mut queued = 0;
+        while worker.send(Command::SetSidetone(1)) != Err(SendError::Busy) {
+            queued += 1;
+        }
+        queued
+    };
+
+    let mut writes = fill();
+    let reads_before = count("31.3 get");
+    worker.set_flyout_open(true); // the queue is full: as a command this was dropped
+    wait_for(|| count("31.3 get") >= reads_before + 3); // the open's refresh, then polls
+
+    writes += fill();
+    worker.set_flyout_open(false);
+    wait_for(|| count("1.11 setGet") == writes); // everything queued has run
+    std::thread::sleep(Duration::from_millis(60));
+    let after_close = count("31.3 get");
+    std::thread::sleep(Duration::from_millis(200)); // five poll intervals
+    assert_eq!(count("31.3 get"), after_close, "no polling once the flyout is closed");
 }
