@@ -35,6 +35,11 @@ final class BoseController: ObservableObject {
 
     @Published private(set) var modes: [BoseMode] = []
     @Published private(set) var modeIndex: Int?
+    /// An editable mode slot with nothing in it, where a Custom mode can go.
+    @Published private(set) var freeModeSlot: Int?
+    private var modesLoad: Task<Void, Never>?
+    /// Tail of the request queue; each exchange waits for the one before it.
+    private var exchangeTail: Task<Void, Never>?
     @Published private(set) var eqBands: [EQBand] = []
     @Published private(set) var multipoint = false
     @Published private(set) var sidetone = 0
@@ -134,6 +139,9 @@ final class BoseController: ObservableObject {
                 await readBattery()
                 await readSource()
                 await loadPeers()
+                // Modes can be added, edited or deleted from the Bose app.
+                await readModeIndex()
+                await loadModes()
             }
         } else if linkState != .connecting,
                   headphones.contains(where: { $0.connected }) || (audioAvailable && !headphones.isEmpty) {
@@ -579,19 +587,44 @@ final class BoseController: ObservableObject {
         return peer
     }
 
+    /// Only one GetAll at a time: overlapping streams interleave and every
+    /// one of them comes back incomplete.
     func loadModes() async {
-        guard linkState.isConnected else { return }
-        do {
-            let packets = try await exchange(31, 1, op: .start, drain: true, timeout: 2.8)
-            let found = packets
-                .filter { $0.fblock == 31 && $0.function == 6 }
-                .compactMap { BoseMode(record: [UInt8]($0.payload)) }
-            let byIndex = Dictionary(found.map { ($0.index, $0) }, uniquingKeysWith: { $1 })
-            modes = byIndex.isEmpty ? BoseMode.fallback : byIndex.values.sorted { $0.index < $1.index }
-            supportsModes = true
-        } catch {
-            if modes.isEmpty { modes = BoseMode.fallback }
+        if let running = modesLoad {
+            await running.value
+            return
         }
+        let task = Task { await performLoadModes() }
+        modesLoad = task
+        await task.value
+        modesLoad = nil
+    }
+
+    private func performLoadModes() async {
+        guard linkState.isConnected else { return }
+        // GetAll streams one 31.6 record per slot and ends with a 31.1
+        // RESULT. Right after a ModeConfig write the stream can time out or
+        // arrive cut short, so only accept a complete list, and retry.
+        for attempt in 1...3 {
+            if let packets = try? await exchange(31, 1, op: .start, drain: true, timeout: 2.8),
+               packets.contains(where: { $0.fblock == 31 && $0.function == 1 && $0.op == .result }) {
+                let records = packets
+                    .filter { $0.fblock == 31 && $0.function == 6 && $0.op == .status }
+                    .map { [UInt8]($0.payload) }
+                let found = records.compactMap { BoseMode(record: $0) }
+                let byIndex = Dictionary(found.map { ($0.index, $0) }, uniquingKeysWith: { $1 })
+                modes = byIndex.isEmpty ? BoseMode.fallback : byIndex.values.sorted { $0.index < $1.index }
+                freeModeSlot = records.filter(BoseMode.isFreeSlot).map { Int($0[0]) }.min()
+                supportsModes = true
+                BarLog.write("modes: \(modes.map(\.name).joined(separator: ", "))"
+                             + (freeModeSlot.map { "; free slot \($0)" } ?? ""))
+                return
+            }
+            BarLog.write("mode list incomplete (attempt \(attempt))")
+            try? await Task.sleep(nanoseconds: 700_000_000)
+        }
+        // Keep what is on screen; only fall back when nothing was ever read.
+        if modes.isEmpty { modes = BoseMode.fallback }
     }
 
     func loadEQ() async {
@@ -652,6 +685,61 @@ final class BoseController: ObservableObject {
     }
 
     // MARK: - Actions
+
+    /// Rewrite an editable mode's noise cancelling. The headphones keep the
+    /// change, so it survives reconnects and the Action button cycle.
+    func updateMode(_ mode: BoseMode, rawCNC: Int, windBlock: Bool) async {
+        guard linkState.isConnected, mode.editable else { return }
+        busyAction = "mode-edit"
+        defer { busyAction = nil }
+        if let i = modes.firstIndex(where: { $0.index == mode.index }) {
+            modes[i].rawCNC = windBlock ? 0 : rawCNC
+            modes[i].windBlock = windBlock
+        }
+        do {
+            let packets = try await exchange(31, 6, op: .setGet,
+                                             payload: mode.configPayload(rawCNC: rawCNC, windBlock: windBlock))
+            try ensureOK(packets, fblock: 31, function: 6)
+            BarLog.write("mode \(mode.index) set cnc=\(rawCNC) wind=\(windBlock)")
+        } catch {
+            BarLog.write("mode \(mode.index) write failed: \(error)")
+            errorText = message(for: error)
+        }
+        await loadModes()
+    }
+
+    /// Create a mode named "Custom" in the free slot, starting from the
+    /// current noise cancelling level, and switch to it.
+    func createCustomMode() async {
+        guard linkState.isConnected, busyAction == nil, let slot = freeModeSlot else { return }
+        // Busy for the whole create so the button can't be clicked again.
+        busyAction = "mode-edit"
+        let current = modes.first(where: { $0.index == modeIndex })
+        var rawCNC = current?.rawCNC ?? 0
+        if current?.windBlock == true, let live = try? await get(1, 5),
+           live.payload.count >= 2 {
+            // Wind Block modes store 0; use the level it is applying now.
+            rawCNC = Int(live.payload[1])
+        }
+        let mode = BoseMode.custom(slot: slot, rawCNC: rawCNC)
+        do {
+            let packets = try await exchange(31, 6, op: .setGet,
+                                             payload: mode.configPayload(rawCNC: rawCNC, windBlock: false))
+            try ensureOK(packets, fblock: 31, function: 6)
+            BarLog.write("created Custom mode in slot \(slot) cnc=\(rawCNC)")
+        } catch {
+            BarLog.write("create Custom mode failed: \(error)")
+            busyAction = nil
+            errorText = message(for: error)
+            return
+        }
+        // Show it right away instead of waiting for the next GetAll.
+        freeModeSlot = nil
+        modes = (modes.filter { $0.index != slot } + [mode]).sorted { $0.index < $1.index }
+        busyAction = nil
+        await setMode(slot)
+        await loadModes()
+    }
 
     func setMode(_ index: Int) async {
         guard linkState.isConnected else { return }
@@ -915,9 +1003,18 @@ final class BoseController: ObservableObject {
         let packet = BmapPacket(fblock: fblock, function: function, port: port,
                                 op: op, payload: Data(payload))
         guard let link else { throw BmapError.notConnected }
-        let data = try await link.send(packet.encoded(), expectReply: expectReply,
+        // One request at a time. The link pumps its run loop while waiting for
+        // a reply, which lets a queued send start and share the reply buffer,
+        // so overlapping requests (e.g. a GetAll drain and an EQ write) would
+        // read each other's replies.
+        let previous = exchangeTail
+        let request = Task { () async throws -> Data in
+            await previous?.value
+            return try await link.send(packet.encoded(), expectReply: expectReply,
                                        drain: drain, timeout: timeout)
-        return BmapPacket.parseAll(data)
+        }
+        exchangeTail = Task { _ = try? await request.value }
+        return BmapPacket.parseAll(try await request.value)
     }
 
     private func get(_ fblock: UInt8, _ function: UInt8, payload: [UInt8] = [],
