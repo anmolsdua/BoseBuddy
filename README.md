@@ -240,7 +240,11 @@ phone's name); redact them before attaching the log to a public issue.
 
 ## Build from source
 
-Requirements: macOS 14+, Xcode command line tools (Swift 5.9+).
+Requirements: macOS 14+, Swift 5.9+. With the macOS 27 SDK you need full
+Xcode: SwiftUI's `@State` is a macro there, and its compiler plugin ships with
+Xcode, not the Command Line Tools. `make install-dev` picks Xcode up
+automatically; for the other targets, prefix
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
 ```sh
 git clone https://github.com/anmolsdua/BoseBuddy.git
@@ -251,6 +255,9 @@ make selftest   # headless BMAP check against paired headphones
 ```
 
 `make install` copies the app to `/Applications` and launches it.
+`make install-dev` is the development loop: it builds with Xcode, quits the
+running app, installs to `/Applications`, relaunches it and prints the first
+log lines.
 
 The build signs ad-hoc with a stable designated requirement:
 
