@@ -1,12 +1,12 @@
-# BoseBuddy for Windows — port plan
+# QC Buddy — Windows port plan
 
 Status: planning. Branch `feature/windows-port`.
 
 ## Goal
 
-A Windows tray app with the same features as the macOS app: control a Bose
-headset over the PC's existing Bluetooth connection, with no phone app, account
-or cloud. Same look as the mockup
+**QC Buddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
+same features. It controls a Bose headset over the PC's existing Bluetooth
+connection, with no phone app, account or cloud. Same look as the mockup
 (<https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy>): a flyout above the tray
 icon with Devices, Noise control and Equalizer cards.
 
@@ -61,7 +61,7 @@ windows/
       peers.rs           4.x paired-device list / connect / disconnect (not in bose-bmap)
       modes.rs           Walk/Custom naming, free slot, "taken over" rule
       eq_presets.rs      presets + store
-      log.rs             same lines as BarLog, %LOCALAPPDATA%\BoseBuddy\BoseBuddy.log
+      log.rs             same lines as BarLog, %LOCALAPPDATA%\QC Buddy\QCBuddy.log
     tests/               fixtures: records captured from the QC45
   ui/
     src/                 React: Header, DevicesCard, NoiseCard, EqualizerCard, Footer
@@ -127,16 +127,18 @@ captured test fixtures. The macOS app is unchanged.
 
 ## Open questions
 
-- App name (see below).
 - Contribute the Windows transport and the 4.x peer commands back to bosectl?
 - Code signing: buy a certificate, or ship unsigned with instructions like the
   macOS DMG does?
 
 ## Name
 
-Recommended: **BoseBuddy**, released as "BoseBuddy for Windows", executable
-`BoseBuddy.exe`. Same product, same website (bosebuddy.com), same README and
-issues. Note: "Bose" is a third-party trademark; that's already true for the
-macOS app, but it matters more if we publish to the Microsoft Store, which can
-reject apps that use another company's trademark in the name. Outside the
-Store (GitHub releases, bosebuddy.com) it's the same situation as today.
+**QC Buddy** (decided 2026-11-25).
+
+- Product name "QC Buddy", executable `QCBuddy.exe`, bundle identifier
+  `com.qcbuddy.app`, install folder and log folder `QC Buddy`.
+- Avoids "Bose" in the name, which keeps the Microsoft Store open as an
+  option. Descriptions still say it works with Bose QuietComfort headphones
+  (factual compatibility), with no Bose logos or artwork.
+- The macOS app stays BoseBuddy. The README and bosebuddy.com link to QC Buddy
+  as the Windows version.
