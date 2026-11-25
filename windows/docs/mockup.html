@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=760">
+<title>QC Buddy mockup</title>
+<style>body{margin:0}a{color:#0f5cc0}input[type=range]{accent-color:#1f5fd1}button{cursor:default}</style>
+</head>
+<body>
+<!-- Static copy of the QC Buddy tray flyout mockup (Windows, Tauri). Source: https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy -->
+<div style="width: 760px; height: 900px; box-sizing: border-box; position: relative; overflow: hidden; background: #c9d3dc; font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; color: #1b1b1b">
+
+  <div style="position: absolute; right: 12px; bottom: 60px; width: 372px; box-sizing: border-box; background: #f7f7f7; border: 1px solid rgba(0,0,0,0.10); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.22); display: flex; flex-direction: column; overflow: hidden">
+
+    <div style="display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; background: #e3ecfb; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f5fd1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"></path><rect x="3" y="14" width="4" height="6" rx="1.5"></rect><rect x="17" y="14" width="4" height="6" rx="1.5"></rect></svg>
+      </div>
+      <div style="flex-grow: 1; min-width: 0">
+        <div style="font-size: 15px; font-weight: 600">Mrs Dynamite</div>
+        <div style="font-size: 12px; color: #4a4a4a; display: flex; align-items: center; gap: 6px; margin-top: 2px">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #1f8a3e; display: inline-block"></span>
+          Connected to: PC + iPhone
+        </div>
+      </div>
+      <div style="font-size: 13px; font-weight: 600; color: #8a4b00; background: #fdf0de; border-radius: 999px; padding: 5px 10px">80%</div>
+    </div>
+
+    <div style="height: 1px; background: rgba(0,0,0,0.08)"></div>
+
+    <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 610px; overflow-y: auto">
+
+      <section style="background: #ffffff; border: 1px solid rgba(0,0,0,0.07); border-radius: 8px; padding: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #5c5c5c">DEVICES</span>
+            <span style="font-size: 11px; color: #4a4a4a; background: #efefef; border-radius: 999px; padding: 2px 8px">2/2 audio</span>
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #4a4a4a">
+            Multipoint
+            <button type="button" aria-pressed="true" aria-label="Multipoint" style="width: 40px; height: 22px; border-radius: 999px; border: 0; padding: 2px; display: flex; align-items: center; justify-content: flex-end; background: #1f5fd1"><span style="width: 18px; height: 18px; border-radius: 50%; background: #ffffff; display: block; box-shadow: 0 1px 2px rgba(0,0,0,0.25)"></span></button>
+          </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(0,0,0,0.06)">
+            <div style="width: 22px; display: flex; justify-content: center; color: #4a4a4a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"></rect><path d="M8 20h8"></path></svg></div>
+            <div style="flex-grow: 1; min-width: 0"><div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #1f8a3e"></span>This PC</div><div style="font-size: 11.5px; color: #555555">This PC · Control + Audio</div></div>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; font: inherit; font-size: 12px; background: transparent; color: #4a4a4a">Disconnect</button></div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(0,0,0,0.06)">
+            <div style="width: 22px; display: flex; justify-content: center; color: #4a4a4a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"></rect><path d="M8 20h8"></path></svg></div>
+            <div style="flex-grow: 1; min-width: 0"><div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #1f8a3e"></span>iPhone</div><div style="font-size: 11.5px; color: #555555">Connected · Playing audio</div></div>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; font: inherit; font-size: 12px; background: transparent; color: #4a4a4a">Disconnect</button></div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(0,0,0,0.06)">
+            <div style="width: 22px; display: flex; justify-content: center; color: #4a4a4a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"></rect><path d="M8 20h8"></path></svg></div>
+            <div style="flex-grow: 1; min-width: 0"><div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: transparent"></span>MacBook Pro</div><div style="font-size: 11.5px; color: #555555">Not connected</div></div>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; font: inherit; font-size: 12px; background: transparent; color: #1f5fd1; font-weight: 600">Switch</button></div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(0,0,0,0.06)">
+            <div style="width: 22px; display: flex; justify-content: center; color: #4a4a4a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="1.5"></rect><path d="M8 20h8"></path></svg></div>
+            <div style="flex-grow: 1; min-width: 0"><div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: transparent"></span>Work laptop</div><div style="font-size: 11.5px; color: #555555">Not connected</div></div>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; font: inherit; font-size: 12px; background: transparent; color: #1f5fd1; font-weight: 600">Switch</button></div>
+      </section>
+
+      <section style="background: #ffffff; border: 1px solid rgba(0,0,0,0.07); border-radius: 8px; padding: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+          <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #5c5c5c">NOISE CONTROL</span>
+          <span style="font-size: 11px; font-weight: 500; color: #555555">ANC 7/10</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+          <button type="button" style="height: 34px; border-radius: 6px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; background: #ececec; color: #1b1b1b">Quiet</button><button type="button" style="height: 34px; border-radius: 6px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; background: #ececec; color: #1b1b1b">Aware</button><button type="button" style="height: 34px; border-radius: 6px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; background: #ececec; color: #1b1b1b">Walk</button><button type="button" style="height: 34px; border-radius: 6px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; background: #1f5fd1; color: #ffffff">Custom</button>
+        </div>
+        
+          <div style="border-top: 1px solid rgba(0,0,0,0.06); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <span style="font-size: 12.5px">Wind Block</span>
+              <button type="button" aria-pressed="false" aria-label="Wind Block" style="width: 40px; height: 22px; border-radius: 999px; border: 0; padding: 2px; display: flex; align-items: center; justify-content: flex-start; background: #b8b8b8"><span style="width: 18px; height: 18px; border-radius: 50%; background: #ffffff; display: block; box-shadow: 0 1px 2px rgba(0,0,0,0.25)"></span></button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; opacity: 1">
+              <label for="anc" style="font-size: 12.5px; white-space: nowrap">Noise cancelling</label>
+              <input id="anc" type="range" min="0" max="10" step="1" value="7" style="flex-grow: 1">
+              <span style="font-size: 12px; font-weight: 600; width: 34px; text-align: right; color: #4a4a4a">7</span>
+            </div>
+          </div>
+        
+        
+      </section>
+
+      <section style="background: #ffffff; border: 1px solid rgba(0,0,0,0.07); border-radius: 8px; padding: 12px">
+        <button type="button" aria-expanded="true" style="width: 100%; display: flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 0; font: inherit; cursor: pointer; color: inherit">
+          <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #5c5c5c">EQUALIZER</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="transform: rotate(90deg)"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="#6b6b6b" stroke-width="1.6" stroke-linecap="round"></path></svg>
+          <span style="flex-grow: 1"></span>
+          <span style="font-size: 11.5px; font-weight: 600; color: #1f5fd1">★ Commute</span>
+        </button>
+        
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Flat</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Bass</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Vocal</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Warm</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Bright</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; background: #ececec; color: #1b1b1b">Night</button><button type="button" style="height: 28px; padding: 0 12px; border-radius: 999px; border: 0; font: inherit; font-size: 12px; font-weight: 600; background: #1f5fd1; color: #ffffff">★ Commute</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px"><label for="eq-bass" style="font-size: 12.5px; width: 48px">Bass</label><input id="eq-bass" type="range" min="-10" max="10" step="1" value="7" style="flex-grow: 1"><span style="font-size: 12px; font-weight: 600; width: 28px; text-align: right; color: #4a4a4a">+7</span></div><div style="display: flex; align-items: center; gap: 10px"><label for="eq-mid" style="font-size: 12.5px; width: 48px">Mid</label><input id="eq-mid" type="range" min="-10" max="10" step="1" value="4" style="flex-grow: 1"><span style="font-size: 12px; font-weight: 600; width: 28px; text-align: right; color: #4a4a4a">+4</span></div><div style="display: flex; align-items: center; gap: 10px"><label for="eq-treble" style="font-size: 12.5px; width: 48px">Treble</label><input id="eq-treble" type="range" min="-10" max="10" step="1" value="1" style="flex-grow: 1"><span style="font-size: 12px; font-weight: 600; width: 28px; text-align: right; color: #4a4a4a">+1</span></div>
+            <div style="font-size: 12px; color: #555555">Saved preset · Rename · Delete</div>
+          </div>
+        
+      </section>
+
+    </div>
+
+    <div style="height: 1px; background: rgba(0,0,0,0.08)"></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px">
+      <a href="#pair" style="font-size: 12.5px; text-decoration: none">+ Pair new device</a>
+      <div style="display: flex; gap: 6px">
+        <button type="button" aria-label="Refresh" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1f5fd1" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"></path><path d="M20 4v5h-5"></path></svg>
+        </button>
+        <button type="button" aria-label="Settings" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1f5fd1" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: #eceff2; border-top: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 16px; box-sizing: border-box; font-size: 12px; color: #2b2b2b">
+    <div style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.07); border-radius: 6px; padding: 6px 8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1b1b1b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="QC Buddy tray icon"><path d="M4 14v-2a8 8 0 0 1 16 0v2"></path><rect x="3" y="14" width="4" height="6" rx="1.5"></rect><rect x="17" y="14" width="4" height="6" rx="1.5"></rect></svg>
+      <span>80%</span>
+    </div>
+    <div style="text-align: right; line-height: 1.25">
+      <div>6:40 PM</div>
+      <div>11/25/2026</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -7,8 +7,11 @@ Status: planning. Branch `feature/windows-port`.
 **QC Buddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
 same features. It controls a Bose headset over the PC's existing Bluetooth
 connection, with no phone app, account or cloud. Same look as the mockup
-(<https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy>): a flyout above the tray
-icon with Devices, Noise control and Equalizer cards.
+(<https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy>; static copy and
+screenshot in [`docs/`](docs/)): a flyout above the tray icon with Devices,
+Noise control and Equalizer cards.
+
+![QC Buddy tray flyout mockup](docs/mockup.png)
 
 ### Parity scope (v1)
 
@@ -39,6 +42,11 @@ charging icon (QC45 doesn't report it, issue #3), firmware updates.
   (bosectl, MIT): packet framing, mode config (QC45 = "prince" 47/39-byte
   layout), battery, EQ, sidetone, multipoint, set_mode / set_cnc / set_wind,
   create/delete profile. Pin the version.
+  **Doesn't compile for Windows as of 0.6.0**: its RFCOMM transport uses
+  Unix-only `std::os::fd` / `libc` sockets without a platform gate (found while
+  writing the M0 spike). Before M1, either send bosectl a small PR gating
+  `transport.rs` / `discovery.rs` behind `cfg(unix)`, or vendor the
+  protocol modules. The M0 spike is self-contained and doesn't use it.
 - **Windows APIs**: Microsoft's `windows` crate: Winsock `AF_BTH` RFCOMM,
   Bluetooth device enumeration, Core Audio (`IMMDeviceEnumerator`,
   `IMMNotificationClient`).

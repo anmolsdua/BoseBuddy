@@ -1,0 +1,18 @@
+[package]
+name = "qcbuddy-spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "M0 spike for QC Buddy: talk to a Bose headset over RFCOMM on Windows"
+license = "MIT"
+
+# Self-contained: bose-bmap 0.6.0 doesn't compile for Windows (its RFCOMM
+# transport uses Unix-only std::os::fd / libc sockets without a cfg gate).
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_Devices_Bluetooth",
+]
