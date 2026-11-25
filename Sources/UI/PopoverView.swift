@@ -528,7 +528,7 @@ struct PopoverView: View {
                 SectionTitle("Noise control")
                 Spacer()
                 if let mode = model.modes.first(where: { $0.index == model.modeIndex }) {
-                    Text("ANC \(10 - min(10, max(0, mode.rawCNC)))/10")
+                    Text(mode.ancLabel)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(.tertiary)
                 }
