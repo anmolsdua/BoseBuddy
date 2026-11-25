@@ -111,6 +111,33 @@ impl EqPresetStore {
         Some(preset)
     }
 
+    /// Like `save`, with the reason when the name can't be used (for the UI).
+    pub fn try_save(&mut self, name: &str, values: &[i32]) -> Result<EqPreset, String> {
+        self.check_name(name, None)?;
+        self.save(name, values).ok_or_else(|| "Couldn't save the preset.".into())
+    }
+
+    /// Like `rename`, with the reason when it can't be done.
+    pub fn try_rename(&mut self, id: &str, name: &str) -> Result<(), String> {
+        if !self.custom.iter().any(|p| p.id == id) {
+            return Err("Built-in presets can't be renamed.".into());
+        }
+        self.check_name(name, Some(id))?;
+        self.rename(id, name);
+        Ok(())
+    }
+
+    fn check_name(&self, name: &str, excluding: Option<&str>) -> Result<(), String> {
+        let clean = clean_name(name);
+        if clean.is_empty() {
+            return Err("Give the preset a name.".into());
+        }
+        if !self.is_name_available(name, excluding) {
+            return Err(format!("\"{clean}\" is already a preset."));
+        }
+        Ok(())
+    }
+
     pub fn rename(&mut self, id: &str, name: &str) -> bool {
         if !self.is_name_available(name, Some(id)) {
             return false;
@@ -192,6 +219,20 @@ mod tests {
         assert!(store.delete(&mine.id));
         assert!(EqPresetStore::open(&path).custom.is_empty());
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn errors_say_why() {
+        let mut store = EqPresetStore::in_memory();
+        assert_eq!(store.try_save("  ", &[1, 2, 3]).unwrap_err(), "Give the preset a name.");
+        assert_eq!(store.try_save("bass", &[1, 2, 3]).unwrap_err(), "\"bass\" is already a preset.");
+        let saved = store.try_save("Commute mix for trains", &[1, 2, 3]).unwrap();
+        assert_eq!(saved.name, "Commute mix f");
+        assert_eq!(store.try_rename("builtin.flat", "Mine").unwrap_err(), "Built-in presets can't be renamed.");
+        assert_eq!(store.try_rename(&saved.id, "Warm").unwrap_err(), "\"Warm\" is already a preset.");
+        assert_eq!(store.try_rename(&saved.id, "commute mix f"), Ok(()), "its own name, other case");
+        assert_eq!(store.try_rename(&saved.id, "Trains"), Ok(()));
+        assert_eq!(store.custom[0].name, "Trains");
     }
 
     #[test]

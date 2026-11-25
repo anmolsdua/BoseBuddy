@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Command, PeerKind } from "./types";
 
@@ -26,6 +27,67 @@ export function Toggle({
     >
       <span />
     </button>
+  );
+}
+
+/**
+ * A range slider that follows the drag locally and sends one write when the
+ * drag or key press ends (a write per step would flood the headset).
+ */
+export function Slider({
+  id,
+  label,
+  min,
+  max,
+  value,
+  disabled,
+  format = (v) => String(v),
+  labelWidth,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  disabled?: boolean;
+  format?: (value: number) => string;
+  labelWidth?: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  // Pointer-up then blur would send the same value twice before the headset answers.
+  const sent = useRef<number | null>(null);
+  useEffect(() => {
+    setDraft(value);
+    sent.current = null;
+  }, [value]);
+  const commit = () => {
+    if (draft !== value && draft !== sent.current) {
+      sent.current = draft;
+      onCommit(draft);
+    }
+  };
+  return (
+    <div className="slider-row">
+      <label htmlFor={id} style={labelWidth ? { width: labelWidth } : undefined}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={draft}
+        disabled={disabled}
+        onChange={(e) => setDraft(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
+      />
+      <span className="slider-value">{format(draft)}</span>
+    </div>
   );
 }
 

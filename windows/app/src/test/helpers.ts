@@ -1,10 +1,13 @@
 import { act } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Mock } from "vitest";
-import type { AppState, Command } from "../types";
+import type { AppState, Command, EqPreset } from "../types";
 
 import connected from "../__fixtures__/connected.json";
 import controlOnly from "../__fixtures__/control-only.json";
+import customMode from "../__fixtures__/custom-mode.json";
+import eqUnsaved from "../__fixtures__/eq-unsaved.json";
+import presetList from "../__fixtures__/presets.json";
 import disconnected from "../__fixtures__/disconnected.json";
 import error from "../__fixtures__/error.json";
 import lowBattery from "../__fixtures__/low-battery.json";
@@ -16,6 +19,8 @@ import slotFree from "../__fixtures__/slot-free.json";
 export const fixtures = {
   connected,
   controlOnly,
+  customMode,
+  eqUnsaved,
   disconnected,
   error,
   lowBattery,
@@ -43,3 +48,6 @@ export function emit(name: string, payload: unknown) {
 }
 
 export const mac = (n: number) => `10:00:00:00:00:0${n}`;
+
+/** The app's `presets` command result: built-ins plus a custom "Commute" [7, 4, 1]. */
+export const presets = presetList as EqPreset[];

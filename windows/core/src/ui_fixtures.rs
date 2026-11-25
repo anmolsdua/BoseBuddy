@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use crate::controller::{Controller, State};
+use crate::eq_presets::EqPresetStore;
 use crate::fake::{peer_mac, FakeHeadset, FakeState};
 use crate::log::Log;
 
@@ -59,6 +60,17 @@ fn fixtures() -> Vec<(&'static str, State)> {
     c.refresh(false);
     out.push(("low-battery", c.state().clone()));
 
+    // Custom mode created and selected (editable, no Wind Block, no free slot).
+    let mut c = controller(FakeState::default());
+    c.create_custom_mode();
+    out.push(("custom-mode", c.state().clone()));
+
+    // EQ that matches no preset; sidetone on.
+    let mut c = controller(FakeState::default());
+    c.apply_eq(&[8, 4, 2]);
+    c.set_sidetone(2);
+    out.push(("eq-unsaved", c.state().clone()));
+
     // Headset off: not connected, but paired.
     out.push(("disconnected", controller(FakeState { powered_off: true, ..FakeState::default() }).state().clone()));
 
@@ -70,8 +82,16 @@ fn ui_fixtures() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../app/src/__fixtures__");
     let update = std::env::var_os("UPDATE_FIXTURES").is_some();
     let mut stale = Vec::new();
-    for (name, state) in fixtures() {
-        let json = serde_json::to_string_pretty(&state).unwrap() + "\n";
+    let mut files: Vec<(&str, String)> =
+        fixtures().into_iter().map(|(name, state)| (name, serde_json::to_string_pretty(&state).unwrap())).collect();
+    // The preset list as the app's `presets` command returns it: built-ins plus a custom one.
+    let mut presets = EqPresetStore::in_memory();
+    let mut commute = presets.save("Commute", &[7, 4, 1]).unwrap();
+    commute.id = "custom.commute".into(); // stable id for the fixture
+    presets.custom = vec![commute];
+    files.push(("presets", serde_json::to_string_pretty(&presets.all()).unwrap()));
+    for (name, json) in files {
+        let json = json + "\n";
         let path = dir.join(format!("{name}.json"));
         if update {
             std::fs::create_dir_all(&dir).unwrap();

@@ -62,7 +62,9 @@ body {
   color: var(--text);
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
-  overflow: hidden;
+  /* The window takes the content's height up to the screen's; past that, scroll. */
+  overflow-x: hidden;
+  overflow-y: auto;
   user-select: none;
   cursor: default;
 }
@@ -506,4 +508,201 @@ footer {
 
 .chip:hover {
   background: var(--chip-hover);
+}
+
+/* Noise editing, EQ and sidetone (M4) */
+
+.mode.create {
+  background: transparent;
+  border: 1px dashed var(--toggle-off);
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.mode.create:hover:not(:disabled) {
+  background: var(--chip);
+}
+
+.mode-editor,
+.eq-body {
+  border-top: 1px solid var(--divider);
+  margin-top: 10px;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eq-body {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.dimmed {
+  opacity: 0.45;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.slider-row label {
+  white-space: nowrap;
+}
+
+.slider-row input[type="range"] {
+  flex-grow: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.slider-value {
+  font-size: 12px;
+  font-weight: 600;
+  width: 34px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.busy-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.card-header.collapse {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.card-header.collapse[aria-expanded="true"] {
+  margin-bottom: 10px;
+}
+
+.chevron {
+  color: var(--label);
+  transition: transform 120ms;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.preset-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.preset-badge.unsaved {
+  color: var(--label);
+  font-weight: 500;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips .chip {
+  background: var(--chip);
+}
+
+.chips .chip:hover:not(:disabled):not(.selected) {
+  background: var(--chip-hover);
+}
+
+.chips .chip.selected {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.chips .chip:disabled:not(.selected) {
+  opacity: 0.6;
+}
+
+.preset-status,
+.preset-editor {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.preset-editor input {
+  flex-grow: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--toggle-off);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+
+.preset-editor input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.muted-link {
+  color: var(--muted);
+}
+
+.field-error {
+  width: 100%;
+  color: var(--error-text);
+  font-size: 11.5px;
+}
+
+.sidetone {
+  border-top: 1px solid var(--divider);
+  padding-top: 10px;
+}
+
+.segmented {
+  display: flex;
+  background: var(--chip);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented button {
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.segmented button.selected {
+  background: var(--card);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }

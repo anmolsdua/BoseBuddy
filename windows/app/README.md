@@ -3,8 +3,12 @@
 Tauri 2 app: a tray icon and a flyout above it (`src/`, React), on top of
 [`../core`](../core) (all headset work). Status: header (name, battery,
 devices holding audio), Devices card (connect / disconnect / switch,
-multipoint, pairing mode) and Noise control card (switching). Mode editing and
-the EQ card come in M4; the core already supports them.
+multipoint, pairing mode), Noise control card (switching, Wind Block and noise
+cancelling for user modes, "+ Custom") and Equalizer card (presets with save /
+rename / delete, bands, sidetone). Settings, autostart and onboarding are M5.
+
+Custom EQ presets are in `%LOCALAPPDATA%\QC Buddy\eq-presets.json`, shared
+with the CLI.
 
 ## Run
 

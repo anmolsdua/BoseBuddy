@@ -3,20 +3,28 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { HeadphonesIcon, send } from "./controls";
 import { DevicesCard } from "./DevicesCard";
-import { ancLabel, audioDevices, type AppState, type Mode } from "./types";
+import { EqCard } from "./EqCard";
+import { NoiseCard } from "./NoiseCard";
+import { audioDevices, type AppState, type EqPreset } from "./types";
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
+  const [presets, setPresets] = useState<EqPreset[]>([]);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     invoke<AppState | null>("get_state").then((s) => s && setState(s));
+    // Presets live in a file the CLI can change too: re-read whenever the flyout shows.
+    const loadPresets = () => invoke<EqPreset[] | null>("presets").then((p) => p && setPresets(p));
+    loadPresets();
+    window.addEventListener("focus", loadPresets);
     const unlisten = listen<AppState>("state", (e) => setState(e.payload));
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && invoke("hide_flyout");
     window.addEventListener("keydown", onKey);
     return () => {
       unlisten.then((f) => f());
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("focus", loadPresets);
     };
   }, []);
 
@@ -32,12 +40,20 @@ export function App() {
 
   return (
     <div className="flyout" ref={root}>
-      {state ? <Flyout state={state} /> : <div className="loading">Starting…</div>}
+      {state ? <Flyout state={state} presets={presets} onPresets={setPresets} /> : <div className="loading">Starting…</div>}
     </div>
   );
 }
 
-export function Flyout({ state }: { state: AppState }) {
+export function Flyout({
+  state,
+  presets = [],
+  onPresets = () => {},
+}: {
+  state: AppState;
+  presets?: EqPreset[];
+  onPresets?: (presets: EqPreset[]) => void;
+}) {
   const connected = state.link.kind === "connected";
   return (
     <>
@@ -56,6 +72,7 @@ export function Flyout({ state }: { state: AppState }) {
           <>
             <DevicesCard state={state} />
             <NoiseCard state={state} />
+            <EqCard state={state} presets={presets} onPresets={onPresets} />
           </>
         ) : (
           <ConnectCard state={state} />
@@ -130,35 +147,6 @@ export function Header({ state }: { state: AppState }) {
         </div>
       )}
     </header>
-  );
-}
-
-export function NoiseCard({ state }: { state: AppState }) {
-  const current = state.modes.find((m) => m.index === state.modeIndex);
-  const switching = state.busy === "mode";
-  const columns = Math.min(4, Math.max(1, state.modes.length));
-  return (
-    <section className="card">
-      <div className="card-header">
-        <span className="card-title">Noise control</span>
-        {current && <span className="card-note">{ancLabel(current)}</span>}
-      </div>
-      <div className="modes" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {state.modes.map((mode: Mode) => (
-          <button
-            key={mode.index}
-            type="button"
-            className={`mode ${mode.index === state.modeIndex ? "selected" : ""}`}
-            aria-pressed={mode.index === state.modeIndex}
-            disabled={switching}
-            title={ancLabel(mode)}
-            onClick={() => mode.index !== state.modeIndex && send({ type: "setMode", args: mode.index })}
-          >
-            {mode.name}
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 

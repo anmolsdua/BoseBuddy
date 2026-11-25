@@ -1,6 +1,6 @@
 # QC Buddy — Windows port plan
 
-Status: M0–M2 done; M3 (Devices card) built, hardware checks pending. Tray app in `windows/app`. Branch `feature/windows-port`.
+Status: M0–M2 done; M3 and M4 built (Devices, mode editing, EQ, sidetone), hardware checks pending. Next: M5. Tray app in `windows/app`. Branch `feature/windows-port`.
 
 ## Goal
 
@@ -103,7 +103,7 @@ captured test fixtures. The macOS app is unchanged.
 | M1 | Core ✅ | `controller`, `peers`, `modes`, `eq_presets`, `log` with unit tests ported from `Tests/*.swift` and the QC45 fixtures. Done: `windows/core`, 51 tests, `qcbuddy` CLI; all reads verified on the QC45. |
 | M2 | Tray + flyout ✅ | Tauri app shows live battery and modes in the mockup UI. Done: flyout, mode switching, battery digits on the tray icon. |
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
-| M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. |
+| M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. Built (UI + core; presets shared with the CLI in `eq-presets.json`); editing still to be checked on hardware. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
 | M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |

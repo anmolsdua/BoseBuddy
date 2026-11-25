@@ -1,0 +1,79 @@
+[
+  {
+    "id": "builtin.flat",
+    "name": "Flat",
+    "values": [
+      0,
+      0,
+      0
+    ],
+    "isBuiltIn": true,
+    "icon": "waveform"
+  },
+  {
+    "id": "builtin.bass",
+    "name": "Bass",
+    "values": [
+      6,
+      0,
+      0
+    ],
+    "isBuiltIn": true,
+    "icon": "speaker"
+  },
+  {
+    "id": "builtin.vocal",
+    "name": "Vocal",
+    "values": [
+      -2,
+      4,
+      2
+    ],
+    "isBuiltIn": true,
+    "icon": "mic"
+  },
+  {
+    "id": "builtin.warm",
+    "name": "Warm",
+    "values": [
+      4,
+      0,
+      -3
+    ],
+    "isBuiltIn": true,
+    "icon": "flame"
+  },
+  {
+    "id": "builtin.bright",
+    "name": "Bright",
+    "values": [
+      0,
+      0,
+      5
+    ],
+    "isBuiltIn": true,
+    "icon": "sun"
+  },
+  {
+    "id": "builtin.night",
+    "name": "Night",
+    "values": [
+      -3,
+      2,
+      -2
+    ],
+    "isBuiltIn": true,
+    "icon": "moon"
+  },
+  {
+    "id": "custom.commute",
+    "name": "Commute",
+    "values": [
+      7,
+      4,
+      1
+    ],
+    "isBuiltIn": false,
+    "icon": null
+  }
+]

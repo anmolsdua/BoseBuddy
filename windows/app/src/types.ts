@@ -57,6 +57,8 @@ export interface AppState {
   pairingMode: boolean;
   pcAudio: boolean;
   supportsModes: boolean;
+  supportsEq: boolean;
+  supportsSidetone: boolean;
   supportsMultipoint: boolean;
   supportsPeers: boolean;
   peersLoaded: boolean;
@@ -78,6 +80,11 @@ export type Command =
   | { type: "connect"; args: string | null }
   | { type: "refresh" }
   | { type: "setMode"; args: number }
+  | { type: "updateMode"; args: { index: number; rawCnc: number; windBlock: boolean } }
+  | { type: "createCustomMode" }
+  | { type: "setEq"; args: { bandId: number; value: number } }
+  | { type: "applyEq"; args: number[] }
+  | { type: "setSidetone"; args: number }
   | { type: "setMultipoint"; args: boolean }
   | { type: "connectPeer"; args: string }
   | { type: "disconnectPeer"; args: string }
@@ -87,9 +94,31 @@ export type Command =
   | { type: "clearPairingMode" }
   | { type: "clearError" };
 
+/** A named Bass/Mid/Treble setting (core's EqPreset). */
+export interface EqPreset {
+  id: string;
+  name: string;
+  values: number[];
+  isBuiltIn: boolean;
+  icon: string | null;
+}
+
+export const MAX_PRESET_NAME = 13;
+
+/** The first preset whose values equal the headset's EQ (like EqPresetStore::preset_matching). */
+export function matchingPreset(presets: EqPreset[], values: number[]): EqPreset | undefined {
+  if (values.length === 0) return undefined;
+  return presets.find((p) => p.values.length === values.length && p.values.every((v, i) => v === values[i]));
+}
+
+/** Noise cancelling strength shown to the user (10 = full); the headset stores 10 - level. */
+export function ancLevel(mode: Mode): number {
+  return 10 - Math.min(10, Math.max(0, mode.rawCnc));
+}
+
 export function ancLabel(mode: Mode): string {
   if (mode.windBlock) return "ANC Auto · Wind Block";
-  return `ANC ${10 - Math.min(10, Math.max(0, mode.rawCnc))}/10`;
+  return `ANC ${ancLevel(mode)}/10`;
 }
 
 /** Whether a device holds one of the headset's audio slots (same rule as the core). */
