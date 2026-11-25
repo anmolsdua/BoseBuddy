@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use crate::protocol::BmapError;
+use crate::protocol::{parse_all, BmapError, Op, Packet};
 
 pub trait Transport: Send {
     /// Send one encoded packet and collect the reply bytes.
@@ -30,6 +30,43 @@ pub trait Transport: Send {
     fn pause(&mut self, duration: Duration) {
         std::thread::sleep(duration);
     }
+}
+
+/// How long a freshly opened channel gets to answer the protocol-version probe.
+pub const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
+
+/// Open the first of `channels` that both connects and answers a BMAP
+/// request (0.1, protocol version). A channel can accept the connection and
+/// never answer, e.g. channel 9 while another QC Buddy holds channel 8.
+pub fn open_first_answering<F>(channels: &[u8], mut connect: F) -> Result<Box<dyn Transport>, BmapError>
+where
+    F: FnMut(u8) -> Result<Box<dyn Transport>, BmapError>,
+{
+    let probe = Packet::new(0, 1, Op::Get, &[]).encode();
+    let mut silent = Vec::new();
+    let mut refused = Vec::new();
+    for &channel in channels {
+        match connect(channel) {
+            Ok(mut link) => match link.exchange(&probe, true, false, PROBE_TIMEOUT) {
+                Ok(bytes) if parse_all(&bytes).iter().any(|p| p.is(0, 1)) => return Ok(link),
+                _ => silent.push(channel),
+            },
+            Err(e) => refused.push(format!("channel {channel}: {e}")),
+        }
+    }
+    let list = |v: &[u8]| v.iter().map(u8::to_string).collect::<Vec<_>>().join(", ");
+    if !silent.is_empty() {
+        let opened = channels.iter().filter(|c| !silent.contains(c)).copied().collect::<Vec<_>>();
+        let busy = if opened.is_empty() { String::new() } else { format!(" ({} refused)", list(&opened)) };
+        return Err(BmapError::Transport(format!(
+            "The headphones didn't answer on channel {}{busy}. Another app may be using them: close QC Buddy or the qcbuddy CLI elsewhere and try again.",
+            list(&silent)
+        )));
+    }
+    Err(BmapError::Transport(format!(
+        "Couldn't open the Bluetooth control channel ({}). Make sure the headphones are on and connected to this PC.",
+        refused.join("; ")
+    )))
 }
 
 #[cfg(windows)]

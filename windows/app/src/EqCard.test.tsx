@@ -134,6 +134,27 @@ describe("EqCard: bands and sidetone", () => {
     expect(screen.queryByRole("group", { name: "EQ presets" })).toBeNull();
   });
 
+  it("doesn't call the EQ Custom before the preset list has loaded", () => {
+    show(state("connected"), []);
+    expect(document.querySelector(".preset-badge")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save as preset…" })).toBeNull();
+    expect(screen.getByLabelText("Bass")).toBeTruthy(); // bands work regardless
+  });
+
+  it("follows a change made elsewhere, even after the slider was moved", () => {
+    const s = state("eqUnsaved"); // treble +2
+    const { rerender } = render(<EqCard state={s} presets={presets} onPresets={() => {}} />);
+    const treble = () => screen.getByLabelText("Treble") as HTMLInputElement;
+    fireEvent.change(treble(), { target: { value: "-4" } }); // dragged, not released
+    // BoseBuddy on the Mac sets treble to +6; the next state carries it.
+    const elsewhere = { ...s, eqBands: s.eqBands.map((b) => (b.bandId === 2 ? { ...b, value: 6 } : b)) };
+    rerender(<EqCard state={elsewhere} presets={presets} onPresets={() => {}} />);
+    expect(treble().value).toBe("6");
+    expect(screen.getByText("+6")).toBeTruthy();
+    fireEvent.blur(treble());
+    expect(sent(), "nothing stale written back").toEqual([]);
+  });
+
   it("isn't shown for headphones without EQ or sidetone", () => {
     const { container } = render(
       <EqCard state={state("connected", { supportsEq: false, supportsSidetone: false })} presets={presets} onPresets={() => {}} />,

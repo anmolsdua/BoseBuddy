@@ -547,3 +547,115 @@ fn worker_polls_while_open_and_ticks_while_closed() {
     assert!(!log.contains(&"31.3 get".to_string()), "no mode polling while closed: {log:?}");
     assert!(log.contains(&"2.2 get".to_string()), "battery on battery ticks: {log:?}");
 }
+
+// MARK: - Opening the control channel
+
+#[test]
+fn opens_the_first_channel_that_answers() {
+    // Channel 8 is held by another app; 2 connects but is silent; 9 speaks BMAP.
+    let fake = FakeState { taken_channels: vec![8], bmap_channel: 9, ..FakeState::default() };
+    let (c, _, log) = connected(fake);
+    assert_eq!(c.state().channel, 9);
+    assert!(log.lines().iter().any(|l| l.contains("established on channel 9")));
+}
+
+#[test]
+fn a_channel_that_connects_but_never_answers_is_not_accepted() {
+    // Seen on hardware: with the tray app holding channel 8, the CLI connected
+    // on channel 9, which never answered, and every request timed out.
+    let headset = FakeHeadset::new(FakeState { taken_channels: vec![8], ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+    c.start();
+    assert!(matches!(c.state().link, LinkState::Failed(_)), "{:?}", c.state().link);
+    let error = c.state().error.clone().unwrap();
+    assert!(error.starts_with("The headphones didn't answer on channel 2, 9 (8 refused)."), "{error}");
+    assert!(error.contains("close QC Buddy or the qcbuddy CLI"), "{error}");
+    // Only the probe was sent: no reads on a channel that isn't BMAP.
+    assert!(headset.state().request_log().is_empty());
+}
+
+#[test]
+fn every_channel_refused_reads_as_a_connection_problem() {
+    let headset = FakeHeadset::new(FakeState { taken_channels: vec![8, 2, 9], ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset), Log::memory());
+    c.connect(Some(crate::fake::HEADSET_ADDRESS));
+    let error = c.state().error.clone().unwrap();
+    assert!(error.starts_with("Couldn't open the Bluetooth control channel (channel 8: connection refused;"), "{error}");
+}
+
+// MARK: - M4 failure paths
+
+#[test]
+fn rejected_mode_edit_shows_the_error_and_rereads_the_mode() {
+    let (mut c, headset, log) = connected(FakeState::default());
+    headset.state().reject_writes.push((31, 6));
+    c.update_mode(2, 4, false);
+    assert_eq!(c.state().error.as_deref(), Some("Headphones returned invalid data for [31.6]."));
+    // The optimistic change is replaced by what the headset still has (Wind Block on).
+    let walk = c.state().modes.iter().find(|m| m.index == 2).unwrap().clone();
+    assert!(walk.wind_block, "{walk:?}");
+    assert_eq!(c.state().busy, None);
+    assert!(log.lines().iter().any(|l| l.starts_with("mode 2 write failed")));
+}
+
+#[test]
+fn rejected_custom_mode_leaves_everything_as_it_was() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().reject_writes.push((31, 6));
+    c.create_custom_mode();
+    assert!(c.state().error.is_some());
+    assert_eq!(c.state().free_mode_slot, Some(3), "slot still free");
+    assert_eq!(c.state().mode_index, Some(0), "didn't switch");
+    assert_eq!(c.state().modes.len(), 3);
+    assert_eq!(c.state().busy, None);
+}
+
+#[test]
+fn rejected_eq_write_rereads_the_bands() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().reject_writes.push((1, 7));
+    c.set_eq(0, 6);
+    assert!(c.state().error.is_some());
+    assert_eq!(c.state().eq_values(), [0, 0, 0], "shows what the headset has, not the attempt");
+    c.clear_error();
+    c.apply_eq(&[4, 0, -3]);
+    assert!(c.state().error.is_some());
+    assert_eq!(c.state().eq_values(), [0, 0, 0]);
+    assert_eq!(c.state().busy, None);
+}
+
+#[test]
+fn rejected_sidetone_goes_back_to_the_old_level() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().reject_writes.push((1, 11));
+    c.set_sidetone(3);
+    assert_eq!(c.state().sidetone, 0);
+    assert!(c.state().error.is_some());
+    assert_eq!(c.state().busy, None);
+}
+
+#[test]
+fn rejected_multipoint_goes_back_to_the_old_setting() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().reject_writes.push((1, 10));
+    c.set_multipoint(false);
+    assert!(c.state().multipoint);
+    assert!(c.state().error.is_some());
+    assert!(headset.state().multipoint);
+}
+
+#[test]
+fn changes_made_elsewhere_show_up_when_the_flyout_opens() {
+    // Cross-app: BoseBuddy on the Mac (or the Bose app) changes the headset.
+    let (mut c, headset, _) = connected(FakeState::default());
+    {
+        let mut fake = headset.state();
+        fake.mode_index = 2;
+        fake.records[2][46] = 0; // Walk: Wind Block off
+        fake.records[2][42] = 4;
+    }
+    c.flyout_opened();
+    assert_eq!(c.state().mode_index, Some(2));
+    let walk = c.state().current_mode().unwrap().clone();
+    assert_eq!((walk.wind_block, walk.anc_level()), (false, 6));
+}

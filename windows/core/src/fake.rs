@@ -52,6 +52,12 @@ pub struct FakeState {
     pub silent: Vec<(u8, u8)>,
     /// Devices stay connected after DISCONNECT (4.2), as a busy phone might.
     pub ignore_disconnect: bool,
+    /// Channels where the connection is refused (another app holds them).
+    pub taken_channels: Vec<u8>,
+    /// The channel the headset speaks BMAP on; others connect but stay silent.
+    pub bmap_channel: u8,
+    /// Requests rejected when written (SETGET / START answered with error 6).
+    pub reject_writes: Vec<(u8, u8)>,
     /// Every request received, in order.
     pub requests: Vec<Packet>,
 }
@@ -99,6 +105,9 @@ impl Default for FakeState {
             connect_error: None,
             silent: Vec::new(),
             ignore_disconnect: false,
+            taken_channels: Vec::new(),
+            bmap_channel: 8,
+            reject_writes: Vec::new(),
             requests: Vec::new(),
         }
     }
@@ -128,6 +137,9 @@ impl FakeState {
         }
         if self.silent.contains(&(p.fblock, p.function)) {
             return vec![];
+        }
+        if matches!(p.op, Op::SetGet | Op::Start) && self.reject_writes.contains(&(p.fblock, p.function)) {
+            return error(6);
         }
         match (p.fblock, p.function, p.op) {
             (0, 1, Op::Get) => vec![status(b"1.1.0".to_vec())],
@@ -281,7 +293,10 @@ impl FakeHeadset {
 }
 
 /// The controller's end of the control channel to the fake headset.
-struct FakeLink(FakeHeadset);
+struct FakeLink {
+    headset: FakeHeadset,
+    channel: u8,
+}
 
 impl Transport for FakeLink {
     fn exchange(
@@ -291,9 +306,13 @@ impl Transport for FakeLink {
         _drain: bool,
         _timeout: Duration,
     ) -> Result<Vec<u8>, BmapError> {
-        let mut state = self.0.state();
+        let mut state = self.headset.state();
         if state.powered_off || !state.control_open {
             return Err(BmapError::NotConnected);
+        }
+        if self.channel != state.bmap_channel {
+            // Connected, but nothing on this channel speaks BMAP.
+            return if expect_reply { Err(BmapError::Timeout) } else { Ok(Vec::new()) };
         }
         let mut out = Vec::new();
         for packet in parse_all(request) {
@@ -312,7 +331,7 @@ impl Transport for FakeLink {
     }
 
     fn channel(&self) -> u8 {
-        8
+        self.channel
     }
 
     fn pause(&mut self, _duration: Duration) {}
@@ -328,14 +347,19 @@ impl Platform for FakeHeadset {
         }]
     }
 
-    fn open(&mut self, address: &str, _channels: &[u8]) -> Result<Box<dyn Transport>, BmapError> {
-        let mut state = self.state();
-        if address != HEADSET_ADDRESS || state.powered_off {
-            return Err(BmapError::Transport("Couldn't open the Bluetooth control channel.".into()));
-        }
-        state.control_open = true;
-        drop(state);
-        Ok(Box::new(FakeLink(self.clone())))
+    fn open(&mut self, address: &str, channels: &[u8]) -> Result<Box<dyn Transport>, BmapError> {
+        crate::transport::open_first_answering(channels, |channel| {
+            let mut state = self.state();
+            if address != HEADSET_ADDRESS || state.powered_off {
+                return Err(BmapError::Transport("connect timed out".into()));
+            }
+            if state.taken_channels.contains(&channel) {
+                return Err(BmapError::Transport("connection refused".into()));
+            }
+            state.control_open = true;
+            drop(state);
+            Ok(Box::new(FakeLink { headset: self.clone(), channel }) as Box<dyn Transport>)
+        })
     }
 
     fn pc_audio_available(&mut self, _name_hint: &str) -> bool {

@@ -24,6 +24,7 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 4 | Attaches by itself when the headset is turned on (within a minute) | App running, headset off → on | |
 | 5 | Notices the headset turning off; flyout says Not connected | App running, headset off | |
 | 6 | Reconnects after the PC sleeps | Sleep, wake, open the flyout | |
+| 6a | A second client (CLI while the app runs) is told the headset is busy, quickly, instead of hanging | `qcbuddy status` with the app running | 2026-11-25 |
 
 ## Noise control
 
@@ -33,14 +34,17 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 8 | Switch modes with the voice prompt | `qcbuddy mode walk`; flyout buttons | 2026-11-25 |
 | 9 | Edit a user mode's ANC / Wind Block; survives a reconnect | `qcbuddy mode-edit walk --anc 7`, then `--wind` | |
 | 10 | "+ Custom" in the free slot, switches to it | `qcbuddy custom` (needs a free slot) | |
+| 10a | Wind Block on/off for a user mode from the flyout | Noise control → Wind Block | 2026-11-25 |
 
 ## Equalizer and settings
 
 | # | Check | How | Last pass |
 |---|---|---|---|
-| 11 | Apply a preset; another app sees it after reopening | `qcbuddy preset warm` | 2026-11-25 |
+| 11 | Apply a preset; another app sees it after reopening | `qcbuddy preset warm`; flyout chips | 2026-11-25 |
+| 11a | Cross-app: change EQ/mode in BoseBuddy (Mac) or the Bose app; QC Buddy shows it when the flyout opens, and BoseBuddy shows QC Buddy's change when its popover opens | Both apps | 2026-11-25 (QC Buddy side) |
+| 11b | Save, rename, delete a custom preset; it shows in `qcbuddy preset` too | Flyout → Save as preset… | |
 | 12 | One band at a time, incl. negative values | `qcbuddy eq-band treble -4` | |
-| 13 | Sidetone levels 0-3 audible on a call | `qcbuddy sidetone 2` | |
+| 13 | Sidetone Off/High/Med/Low audible on a call | Flyout → Sidetone | 2026-11-25 (set; not heard on a call) |
 | 14 | Multipoint off drops to one device; on again | Flyout toggle | |
 
 ## Devices

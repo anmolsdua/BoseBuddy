@@ -28,6 +28,8 @@ export function EqCard({
   const current = matchingPreset(presets, values);
   const eqBusy = state.busy?.startsWith("eq") ?? false;
   const hasEq = state.supportsEq && state.eqBands.length > 0;
+  // The list always has the built-ins once loaded; until then don't call the EQ "Custom".
+  const presetsLoaded = presets.length > 0;
   if (!hasEq && !state.supportsSidetone) return null;
 
   const toggle = () => {
@@ -43,7 +45,7 @@ export function EqCard({
           <path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
         <span className="spacer" />
-        {hasEq && (
+        {hasEq && presetsLoaded && (
           <span className={`preset-badge ${current ? "" : "unsaved"}`}>
             {current ? `${current.isBuiltIn ? "" : "★ "}${current.name}` : "Custom"}
           </span>
@@ -82,7 +84,7 @@ export function EqCard({
                   onCommit={(value) => send({ type: "setEq", args: { bandId: band.bandId, value } })}
                 />
               ))}
-              <PresetStatus current={current} values={values} onPresets={onPresets} />
+              {presetsLoaded && <PresetStatus current={current} values={values} onPresets={onPresets} />}
             </>
           )}
           {state.supportsSidetone && (

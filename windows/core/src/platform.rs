@@ -182,7 +182,9 @@ mod win {
         fn open(&mut self, address: &str, channels: &[u8]) -> Result<Box<dyn Transport>, BmapError> {
             let addr = mac_to_u64(address)
                 .ok_or_else(|| BmapError::Transport(format!("Not a Bluetooth address: {address}")))?;
-            Ok(Box::new(WinRfcomm::open(addr, channels)?))
+            crate::transport::open_first_answering(channels, |channel| {
+                WinRfcomm::open(addr, &[channel]).map(|link| Box::new(link) as Box<dyn Transport>)
+            })
         }
 
         fn pc_audio_available(&mut self, name_hint: &str) -> bool {

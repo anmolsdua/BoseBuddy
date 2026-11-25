@@ -97,6 +97,16 @@ describe("App", () => {
     expect(screen.getByText("Not connected")).toBeTruthy();
   });
 
+  it("re-reads EQ presets whenever the flyout gets focus (the CLI may have saved one)", async () => {
+    invokeMock.mockImplementation((name: string) => Promise.resolve(name === "get_state" ? fixtures.connected : name === "presets" ? [] : null));
+    render(<App />);
+    await screen.findByText("80%");
+    const presetCalls = () => invokeMock.mock.calls.filter(([name]) => name === "presets").length;
+    expect(presetCalls()).toBe(1);
+    window.dispatchEvent(new Event("focus"));
+    expect(presetCalls()).toBe(2);
+  });
+
   it("shows Starting… until the core reports", () => {
     render(<App />);
     expect(screen.getByText("Starting…")).toBeTruthy();

@@ -9,7 +9,7 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use qcbuddy_core::eq_presets::{EqPreset, EqPresetStore};
+use qcbuddy_core::eq_presets::EqPreset;
 use qcbuddy_core::fake::FakeHeadset;
 use qcbuddy_core::log::{data_dir, default_path, Log};
 use qcbuddy_core::platform::Platform;
@@ -18,6 +18,8 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
+
+mod presets;
 
 const FLYOUT: &str = "flyout";
 const TRAY: &str = "main";
@@ -65,38 +67,32 @@ fn fit_flyout(height: f64, window: WebviewWindow) {
     place(&window);
 }
 
-// EQ presets: the same file as the CLI, re-read on every call so presets
-// saved elsewhere show up. The simulated headset gets its own file.
+// EQ presets: the same file as the CLI (see presets.rs). The simulated
+// headset gets its own file.
 
-fn preset_store() -> EqPresetStore {
+fn presets_path() -> std::path::PathBuf {
     let file = if std::env::var_os("QCBUDDY_FAKE").is_some() { "eq-presets-fake.json" } else { "eq-presets.json" };
-    EqPresetStore::open(data_dir().join(file))
+    data_dir().join(file)
 }
 
 #[tauri::command]
 fn presets() -> Vec<EqPreset> {
-    preset_store().all()
+    presets::list(&presets_path())
 }
 
 #[tauri::command]
 fn save_preset(name: String, values: Vec<i32>) -> Result<Vec<EqPreset>, String> {
-    let mut store = preset_store();
-    store.try_save(&name, &values)?;
-    Ok(store.all())
+    presets::save(&presets_path(), &name, &values)
 }
 
 #[tauri::command]
 fn rename_preset(id: String, name: String) -> Result<Vec<EqPreset>, String> {
-    let mut store = preset_store();
-    store.try_rename(&id, &name)?;
-    Ok(store.all())
+    presets::rename(&presets_path(), &id, &name)
 }
 
 #[tauri::command]
 fn delete_preset(id: String) -> Vec<EqPreset> {
-    let mut store = preset_store();
-    store.delete(&id);
-    store.all()
+    presets::delete(&presets_path(), &id)
 }
 
 fn main() {

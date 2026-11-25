@@ -747,6 +747,7 @@ impl Controller {
             return;
         }
         self.begin("sidetone");
+        let previous = self.state.sidetone;
         self.state.sidetone = level;
         match self
             .exchange(1, 11, Op::SetGet, &[1, level], true, false, DEFAULT_TIMEOUT)
@@ -756,7 +757,10 @@ impl Controller {
                 self.log.write(format!("sidetone -> {level}"));
                 self.load_sidetone();
             }
-            Err(error) => self.set_error(error.to_string()),
+            Err(error) => {
+                self.state.sidetone = previous;
+                self.set_error(error.to_string());
+            }
         }
         self.end();
     }
