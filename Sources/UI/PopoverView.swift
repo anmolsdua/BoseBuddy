@@ -668,8 +668,8 @@ struct PopoverView: View {
     private var presetBadge: some View {
         let preset = currentPreset
         return HStack(spacing: 3) {
-            if let preset, !preset.isBuiltIn {
-                Image(systemName: "star.fill")
+            if let preset {
+                Image(systemName: preset.symbol)
                     .font(.system(size: 8))
             }
             Text(preset?.name ?? "Custom")
@@ -989,11 +989,9 @@ private struct PresetChip: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 3) {
-                if !preset.isBuiltIn {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 8))
-                }
+            HStack(spacing: 4) {
+                Image(systemName: preset.symbol)
+                    .font(.system(size: 9))
                 Text(preset.name)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)

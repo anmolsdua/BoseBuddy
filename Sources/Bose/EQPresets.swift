@@ -8,6 +8,11 @@ struct EQPreset: Identifiable, Codable, Equatable {
     /// Band values ordered by EQ band ID (Bass, Mid, Treble).
     var values: [Int]
     var isBuiltIn = false
+    /// SF Symbol shown on the chip. Built-ins have one; custom presets fall
+    /// back to a star.
+    var icon: String?
+
+    var symbol: String { icon ?? "star.fill" }
 
     static let maxNameLength = 13
 
@@ -16,12 +21,12 @@ struct EQPreset: Identifiable, Codable, Equatable {
     }
 
     static let builtIns: [EQPreset] = [
-        EQPreset(id: "builtin.flat", name: "Flat", values: [0, 0, 0], isBuiltIn: true),
-        EQPreset(id: "builtin.bass", name: "Bass", values: [6, 0, 0], isBuiltIn: true),
-        EQPreset(id: "builtin.vocal", name: "Vocal", values: [-2, 4, 2], isBuiltIn: true),
-        EQPreset(id: "builtin.warm", name: "Warm", values: [4, 0, -3], isBuiltIn: true),
-        EQPreset(id: "builtin.bright", name: "Bright", values: [0, 0, 5], isBuiltIn: true),
-        EQPreset(id: "builtin.night", name: "Night", values: [-3, 2, -2], isBuiltIn: true)
+        EQPreset(id: "builtin.flat", name: "Flat", values: [0, 0, 0], isBuiltIn: true, icon: "waveform"),
+        EQPreset(id: "builtin.bass", name: "Bass", values: [6, 0, 0], isBuiltIn: true, icon: "speaker.wave.3.fill"),
+        EQPreset(id: "builtin.vocal", name: "Vocal", values: [-2, 4, 2], isBuiltIn: true, icon: "mic.fill"),
+        EQPreset(id: "builtin.warm", name: "Warm", values: [4, 0, -3], isBuiltIn: true, icon: "flame.fill"),
+        EQPreset(id: "builtin.bright", name: "Bright", values: [0, 0, 5], isBuiltIn: true, icon: "sun.max.fill"),
+        EQPreset(id: "builtin.night", name: "Night", values: [-3, 2, -2], isBuiltIn: true, icon: "moon.fill")
     ]
 }
 
