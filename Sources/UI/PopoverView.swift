@@ -635,23 +635,23 @@ struct PopoverView: View {
 
     private var presetChips: some View {
         let selectedID = currentPreset?.id
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(presets.all) { preset in
-                    PresetChip(preset: preset, isSelected: preset.id == selectedID) {
-                        presetEditor = nil
-                        Task { await model.applyEQ(preset.values) }
-                    }
-                    .contextMenu {
-                        if !preset.isBuiltIn {
-                            Button("Rename…") { beginRename(preset) }
-                            Button("Delete", role: .destructive) { presets.delete(preset.id) }
-                        }
+        // Wrap instead of scrolling so custom presets after the built-ins
+        // stay visible.
+        return FlowLayout(spacing: 6) {
+            ForEach(presets.all) { preset in
+                PresetChip(preset: preset, isSelected: preset.id == selectedID) {
+                    presetEditor = nil
+                    Task { await model.applyEQ(preset.values) }
+                }
+                .contextMenu {
+                    if !preset.isBuiltIn {
+                        Button("Rename…") { beginRename(preset) }
+                        Button("Delete", role: .destructive) { presets.delete(preset.id) }
                     }
                 }
             }
-            .padding(.vertical, 1)
         }
+        .padding(.vertical, 1)
         .disabled(model.busyAction != nil)
     }
 
@@ -900,6 +900,56 @@ private struct SectionTitle: View {
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
             .kerning(0.4)
+    }
+}
+
+/// Lays out children left to right, wrapping onto new lines when full.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let rows = rows(for: subviews, width: width)
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        let used = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? used, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(for: subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func rows(for subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if needed > width, !current.indices.isEmpty {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }
 
