@@ -91,7 +91,7 @@ captured test fixtures. The macOS app is unchanged.
 
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **Spike** (2–4 days) | Console app on Windows connects to the QC45 on channel 8 with `bose-bmap` + our transport, prints battery, firmware, mode list, switches Quiet → Walk with the prompt. Answers the risks below. |
+| M0 | **Spike** (4–6 days) | Console app on the Windows test PC passes the M0 checklist below and answers the risks. |
 | M1 | Core | `controller`, `peers`, `modes`, `eq_presets`, `log` with unit tests ported from `Tests/*.swift` and the QC45 fixtures. |
 | M2 | Tray + flyout | Tauri app shows live battery and modes in the mockup UI. |
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. |
@@ -99,6 +99,28 @@ captured test fixtures. The macOS app is unchanged.
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
 | M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
+
+## M0 checklist
+
+Run on the Windows test PC (see Test setup) with the QC45 paired and playing
+audio. Each line is pass/fail and goes in the M0 report.
+
+1. Opens RFCOMM channel 8 (fall back to 2, 9) while the QC45 is connected for
+   audio; audio keeps playing throughout.
+2. Reads battery, firmware, product name.
+3. Reads the full mode list (Quiet, Aware, Walk, slot 3) via GetAll with the
+   31.1 RESULT, and switches Quiet → Walk with the voice prompt.
+4. **Core feature:** reads the headset's paired-device list (4.4) with
+   connected / active state, the same data as BoseBuddy's `peers:` log line.
+5. **Core feature:** disconnects the iPhone (4.2) and reconnects it (4.1);
+   the device list reflects both.
+6. With both audio slots full, connecting a third device follows BoseBuddy's
+   auto-drop rule (drops the non-PC device).
+7. "Connect audio" for this PC: from a state where the PC has only the control
+   link, ask the headset to connect the PC (CONNECT self) and check whether
+   Windows brings up the audio endpoint.
+8. Requests are serialized: a GetAll during other reads never returns a
+   mixed-up reply (run it in a loop for a minute).
 
 ## Risks to settle in M0
 
@@ -116,6 +138,24 @@ captured test fixtures. The macOS app is unchanged.
    tray app.
 6. **SmartScreen** on an unsigned installer (same problem as Gatekeeper on
    macOS).
+
+## Test setup
+
+- **Hardware:** an Intel (x64) Windows PC with built-in Bluetooth, the QC45
+  paired to it, plus the iPhone (and the Mac) as the headset's other devices
+  for multipoint tests. x64 is the primary target; Windows on ARM is later.
+- **Workflow:**
+  1. Write code on the Mac in the `BoseBuddy-windows` worktree; push
+     `feature/windows-port`.
+  2. CI (GitHub Actions, `windows-latest`) builds and runs the Rust unit tests
+     on every push. Runners have no Bluetooth, so CI never talks to a headset.
+  3. On the Windows PC: pull, build (`cargo run` for the spike, `npm run tauri
+     dev` for the app), and run the hardware checks. Logs from
+     `%LOCALAPPDATA%\QC Buddy\QCBuddy.log` come back to the Mac for review.
+- **Windows PC setup:** Rust (MSVC toolchain + Visual Studio Build Tools with
+  the "Desktop development with C++" workload), Node LTS, Git; WebView2 is
+  already on current Windows 10/11. Tauri CLI comes in with the app's npm
+  dependencies.
 
 ## Testing
 
