@@ -1,6 +1,6 @@
 [package]
 name = "qcbuddy-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 publish = false
 description = "QC Buddy core: talks to a Bose headset over Bluetooth RFCOMM (port of BoseBuddy's controller)"

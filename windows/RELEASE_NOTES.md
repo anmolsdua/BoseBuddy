@@ -1,11 +1,25 @@
-# QC Buddy 0.1.0 (Windows)
+# QC Buddy 0.1.1 (Windows)
 
-The first release of **QC Buddy**, the Windows sibling of BoseBuddy: a tray
+**QC Buddy** is the Windows sibling of BoseBuddy: a tray
 app that controls Bose QuietComfort headphones over the PC's existing
 Bluetooth connection. No phone app, account or cloud.
 
 Works with Bose QuietComfort headphones. Tested on a **QC45 (firmware
 4.0.4)**; other models may work and are untested.
+
+## What changed in 0.1.1
+
+- **The tray battery now follows the taskbar's light or dark mode** while
+  QC Buddy runs. Before, it kept the colors from when it started, so after
+  switching Windows to light mode the white digits were invisible.
+- A connection that can't be made fails in about 5 seconds with a clear
+  message, instead of taking up to a minute.
+- If another copy of QC Buddy (or the `qcbuddy` command) is already using the
+  headphones, you're told so instead of getting timeouts.
+- More reliable under load: replies are matched to the request that asked
+  for them, and opening or closing the flyout is never lost.
+
+0.1.0 was not published; this is the first public release.
 
 ## What it does
 
@@ -26,8 +40,8 @@ Works with Bose QuietComfort headphones. Tested on a **QC45 (firmware
 QC Buddy is **not code-signed yet**, so Windows SmartScreen warns on the
 first run. That's expected, not a damaged download.
 
-1. Download `QCBuddy_0.1.0_x64-setup.exe` (and, if you like,
-   `SHA256SUMS.txt` to check it: `Get-FileHash QCBuddy_0.1.0_x64-setup.exe`).
+1. Download `QCBuddy_0.1.1_x64-setup.exe` (and, if you like,
+   `SHA256SUMS.txt` to check it: `Get-FileHash QCBuddy_0.1.1_x64-setup.exe`).
 2. Run it. If you see **"Windows protected your PC"**, click **More info**,
    then **Run anyway**.
 3. It installs for your user only (no admin prompt) and adds **QC Buddy** to

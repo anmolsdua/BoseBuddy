@@ -6,6 +6,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -36,10 +37,12 @@ struct AppState {
     /// When the flyout last hid on losing focus. A tray click that arrives
     /// right after is the same click, so it shouldn't reopen the flyout.
     hidden_at: Mutex<Option<Instant>>,
-    /// The taskbar is light, so tray icons are drawn dark.
-    light_taskbar: bool,
-    /// Battery shown on the tray icon (None = headphones glyph), to redraw only on change.
-    tray_battery: Mutex<Option<Option<u8>>>,
+    /// The taskbar is light, so tray icons are drawn dark. Follows the
+    /// Windows setting while the app runs (see watch_taskbar_theme).
+    light_taskbar: AtomicBool,
+    /// What the tray icon shows: (battery, drawn for a light taskbar).
+    /// Redrawn only when either changes.
+    tray_shown: Mutex<Option<TrayLook>>,
 }
 
 /// The newest snapshot. The flyout calls this after subscribing to `state`.
@@ -125,11 +128,12 @@ fn main() {
                 worker,
                 latest,
                 hidden_at: Mutex::new(None),
-                light_taskbar: light_taskbar(),
-                tray_battery: Mutex::new(None),
+                light_taskbar: AtomicBool::new(light_taskbar()),
+                tray_shown: Mutex::new(None),
             });
 
             build_tray(&handle)?;
+            watch_taskbar_theme(handle.clone());
             if let Some(window) = handle.get_webview_window(FLYOUT) {
                 let app = handle.clone();
                 window.on_window_event(move |event| match event {
@@ -167,17 +171,67 @@ fn platform() -> Box<dyn Platform> {
 /// next revision, then emit it, then update the tray.
 fn publish(app: &AppHandle, latest: &Latest, state: &State) {
     let _ = app.emit("state", latest.record(state));
-    let Some(shared) = app.try_state::<AppState>() else { return };
     let Some(tray) = app.tray_by_id(TRAY) else { return };
     let _ = tray.set_tooltip(Some(tooltip(state)));
     let battery = if state.link.is_connected() { state.battery } else { None };
-    if let Ok(mut shown) = shared.tray_battery.lock() {
-        if *shown != Some(battery) {
-            *shown = Some(battery);
-            let _ = tray.set_icon(Some(tray_icon(battery, shared.light_taskbar)));
+    show_on_tray(app, battery);
+}
+
+/// What the tray icon shows: the battery (None = headphones glyph), and
+/// whether it's drawn for a light taskbar.
+type TrayLook = (Option<u8>, bool);
+
+/// Draw `battery` on the tray in the taskbar's current contrast color,
+/// unless that's what it already shows.
+fn show_on_tray(app: &AppHandle, battery: Option<u8>) {
+    let Some(shared) = app.try_state::<AppState>() else { return };
+    let Some(tray) = app.tray_by_id(TRAY) else { return };
+    let look = (battery, shared.light_taskbar.load(Ordering::SeqCst));
+    if let Ok(mut shown) = shared.tray_shown.lock() {
+        if needs_redraw(*shown, look) {
+            *shown = Some(look);
+            let _ = tray.set_icon(Some(tray_icon(look.0, look.1)));
         }
     };
 }
+
+fn needs_redraw(shown: Option<TrayLook>, now: TrayLook) -> bool {
+    shown != Some(now)
+}
+
+/// Redraw the tray icon when Windows switches between a light and a dark
+/// taskbar. Blocks a thread on the registry key until it changes.
+#[cfg(windows)]
+fn watch_taskbar_theme(app: AppHandle) {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegNotifyChangeKeyValue, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_NOTIFY,
+        REG_NOTIFY_CHANGE_LAST_SET,
+    };
+    std::thread::Builder::new()
+        .name("qcbuddy-theme".into())
+        .spawn(move || unsafe {
+            let mut key = HKEY::default();
+            let path = w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if RegOpenKeyExW(HKEY_CURRENT_USER, path, None, KEY_NOTIFY, &mut key).is_err() {
+                return;
+            }
+            // Returns each time a value under the key is written.
+            while RegNotifyChangeKeyValue(key, false, REG_NOTIFY_CHANGE_LAST_SET, None, false).is_ok() {
+                let light = light_taskbar();
+                let shared = app.state::<AppState>();
+                if shared.light_taskbar.swap(light, Ordering::SeqCst) != light {
+                    let battery = shared.tray_shown.lock().ok().and_then(|s| *s).and_then(|(b, _)| b);
+                    show_on_tray(&app, battery);
+                }
+            }
+            let _ = RegCloseKey(key);
+        })
+        .ok();
+}
+
+#[cfg(not(windows))]
+fn watch_taskbar_theme(_app: AppHandle) {}
 
 /// The battery level as digits, or the headphones glyph when unknown.
 fn tray_icon(battery: Option<u8>, light_taskbar: bool) -> Image<'static> {
@@ -251,7 +305,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open QC Buddy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
-    let light = app.state::<AppState>().light_taskbar;
+    let light = app.state::<AppState>().light_taskbar.load(Ordering::SeqCst);
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon(None, light))
         .tooltip("QC Buddy")
@@ -406,6 +460,16 @@ mod tests {
         assert_eq!(tooltip(c.state()), "QC Buddy · Bose QC45 · 80%");
         let off = Controller::new(Box::new(FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() })), Log::memory());
         assert_eq!(tooltip(off.state()), "QC Buddy · not connected");
+    }
+
+    #[test]
+    fn tray_redraws_when_the_battery_or_the_taskbar_theme_changes() {
+        assert!(needs_redraw(None, (Some(70), false)), "first draw");
+        assert!(!needs_redraw(Some((Some(70), false)), (Some(70), false)), "nothing changed");
+        assert!(needs_redraw(Some((Some(70), false)), (Some(69), false)), "battery changed");
+        // The bug: white digits stayed on a taskbar switched to light mode.
+        assert!(needs_redraw(Some((Some(70), false)), (Some(70), true)), "taskbar went light");
+        assert!(needs_redraw(Some((None, true)), (None, false)), "glyph, taskbar went dark");
     }
 
     #[test]
