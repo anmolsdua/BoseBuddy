@@ -1,0 +1,29 @@
+name: Windows
+
+on:
+  push:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+jobs:
+  core:
+    # Runners have no Bluetooth: this builds and runs the unit tests, which use
+    # the simulated headset. Hardware checks happen on the Windows test PC.
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows/core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: windows/core
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: CLI smoke test (simulated headset)
+        run: cargo run --quiet --bin qcbuddy -- --fake status

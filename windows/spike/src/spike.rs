@@ -226,7 +226,8 @@ fn step2_reads(s: &mut Session) -> (Outcome, String) {
     let init = s.get(0, 1, &[]).map(|p| bmap::hex(&p.payload)).unwrap_or_else(|e| e);
     let battery = s.get(2, 2, &[]).map(|p| p.payload.first().copied());
     let firmware = s.get(0, 5, &[]).map(|p| bmap::string(&p.payload));
-    let name = s.get(1, 2, &[]).map(|p| bmap::string(&p.payload));
+    // 1.2 Status starts with a 0x00 byte before the name (QC45 fw 4.0.4).
+    let name = s.get(1, 2, &[]).map(|p| bmap::string(p.payload.get(1..).unwrap_or_default()));
     println!("    init 0.1: {init}");
     println!("    battery:  {:?}", battery);
     println!("    firmware: {:?}", firmware);

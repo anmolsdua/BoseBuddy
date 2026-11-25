@@ -1,6 +1,6 @@
 # QC Buddy — Windows port plan
 
-Status: planning. Branch `feature/windows-port`.
+Status: M0 done, M1 done (core crate + `qcbuddy` CLI). Next: M2. Branch `feature/windows-port`.
 
 ## Goal
 
@@ -38,15 +38,13 @@ charging icon (QC45 doesn't report it, issue #3), firmware updates.
 
 - **Tauri 2**: Rust backend, web UI in WebView2, built-in tray icon.
 - **UI**: TypeScript + React + Vite, styled from the mockup.
-- **Protocol**: [`bose-bmap`](https://crates.io/crates/bose-bmap) 0.6.0
-  (bosectl, MIT): packet framing, mode config (QC45 = "prince" 47/39-byte
-  layout), battery, EQ, sidetone, multipoint, set_mode / set_cnc / set_wind,
-  create/delete profile. Pin the version.
-  **Doesn't compile for Windows as of 0.6.0**: its RFCOMM transport uses
-  Unix-only `std::os::fd` / `libc` sockets without a platform gate (found while
-  writing the M0 spike). Before M1, either send bosectl a small PR gating
-  `transport.rs` / `discovery.rs` behind `cfg(unix)`, or vendor the
-  protocol modules. The M0 spike is self-contained and doesn't use it.
+- **Protocol**: ported from BoseBuddy's own Swift sources (`Protocol.swift`,
+  `NoiseModes.swift`, `BoseController.swift`), which already work on the
+  QC45, into `windows/core`. Decided in M1 (2026-11-25) instead of
+  [`bose-bmap`](https://crates.io/crates/bose-bmap): 0.6.0 doesn't compile
+  for Windows (its RFCOMM transport uses Unix-only `std::os::fd` / `libc`
+  sockets without a platform gate), and it lacks the 4.x peer commands. The
+  QC45 mode layout still credits bosectl (MIT) in `modes.rs`.
 - **Windows APIs**: Microsoft's `windows` crate: Winsock `AF_BTH` RFCOMM,
   Bluetooth device enumeration, Core Audio (`IMMDeviceEnumerator`,
   `IMMNotificationClient`).
@@ -55,22 +53,23 @@ charging icon (QC45 doesn't report it, issue #3), firmware updates.
 
 ## Layout
 
+`windows/core` (M1, done) is a library crate with no Tauri dependency, so CI
+tests it without Node or WebView2. It also builds the **`qcbuddy` CLI**, which
+runs every feature from a terminal for hardware testing without the UI (see
+[`core/README.md`](core/README.md)). The Tauri app (M2) depends on it and
+adds only the tray, window and IPC.
+
 ```
 windows/
   PLAN.md
+  core/                  qcbuddy-core + qcbuddy CLI (protocol, controller, worker,
+                         peers, modes, eq_presets, identity, log, platform, fake)
   src-tauri/
     Cargo.toml
     src/
       main.rs            tray, window, IPC wiring
-      transport.rs       WinRfcomm: bose_bmap::Transport over AF_BTH, channel 8 → 2 → 9
-      discovery.rs       paired Bose headsets (name or vendor ID 0x009E)
-      audio.rs           is the headset a Windows audio endpoint? (+ change events)
-      controller.rs      port of BoseController: state, request queue, polling
-      peers.rs           4.x paired-device list / connect / disconnect (not in bose-bmap)
-      modes.rs           Walk/Custom naming, free slot, "taken over" rule
-      eq_presets.rs      presets + store
-      log.rs             same lines as BarLog, %LOCALAPPDATA%\QC Buddy\QCBuddy.log
-    tests/               fixtures: records captured from the QC45
+      commands.rs        Tauri commands → core::worker::Command; `state` event
+      audio_events.rs    IMMNotificationClient → refresh PC audio (core polls on open today)
   ui/
     src/                 React: Header, DevicesCard, NoiseCard, EqualizerCard, Footer
 ```
@@ -100,7 +99,7 @@ captured test fixtures. The macOS app is unchanged.
 | # | Milestone | Done when |
 |---|---|---|
 | M0 | **Spike** (4–6 days) | Console app on the Windows test PC passes the M0 checklist below and answers the risks. |
-| M1 | Core | `controller`, `peers`, `modes`, `eq_presets`, `log` with unit tests ported from `Tests/*.swift` and the QC45 fixtures. |
+| M1 | Core ✅ | `controller`, `peers`, `modes`, `eq_presets`, `log` with unit tests ported from `Tests/*.swift` and the QC45 fixtures. Done: `windows/core`, 51 tests, `qcbuddy` CLI; all reads verified on the QC45. |
 | M2 | Tray + flyout | Tauri app shows live battery and modes in the mockup UI. |
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. |
@@ -129,6 +128,28 @@ audio. Each line is pass/fail and goes in the M0 report.
    Windows brings up the audio endpoint.
 8. Requests are serialized: a GetAll during other reads never returns a
    mixed-up reply (run it in a loop for a minute).
+
+### M0 results (2026-11-25, Dell test PC, QC45 fw 4.0.4)
+
+| # | Result |
+|---|---|
+| 1 | **Pass.** Channel 8 opens on the first try while the headset plays audio; audio kept playing. The audio was from the MacBook (see the Remote Desktop note), so playback from the PC itself is still to be confirmed. |
+| 2 | **Pass.** Battery, firmware, name. The 1.2 name reply starts with a 0x00 byte; BoseBuddy's parser stops at it and shows the default name (macOS bug, fixed in `core`). |
+| 3 | Pass via the `qcbuddy` CLI: the full mode list (Quiet, Aware, Walk, Custom) with the 31.1 RESULT. Mode switching not yet run on hardware. |
+| 4 | **Pass.** The paired-device list with connected / local flags and the active source. |
+| 5–7 | Not run on hardware; covered by the controller tests against the simulated headset. Run with `qcbuddy connect / disconnect / pc-audio`. |
+| 8 | **Pass.** 34 rounds of mixed requests in 20 s, no mismatched or incomplete replies. |
+
+Findings:
+
+- **Remote Desktop hides the PC's audio.** In an RDP session the only active
+  output is "Remote Audio": sound goes PC → RDP → client → headset, so the
+  headset reports the client as the source. Hardware audio checks need the
+  RDP client set to "Play on remote computer", or the PC's own screen.
+- Windows exposes the Device ID profile in PnP instance IDs
+  (`VID&0001009E`), so renamed headsets are found by vendor ID.
+- The GNU Rust toolchain (`x86_64-pc-windows-gnu`) builds everything too;
+  MSVC stays the target for releases.
 
 ## Risks to settle in M0
 
@@ -196,8 +217,8 @@ audio. Each line is pass/fail and goes in the M0 report.
   signing); keep the private key out of the repo, in a GitHub Actions secret.
 - **Launch at login:** Tauri `autostart` plugin (registry Run key), fine
   outside MSIX.
-- **Third-party notices:** ship `bose-bmap`'s MIT notice with the installer
-  and in the About screen.
+- **Third-party notices:** credit bosectl (MIT) for the QC45 mode layout in
+  the About screen; list the Rust crates' licenses with the installer.
 
 ### Follow-up: Microsoft Store (M7)
 
