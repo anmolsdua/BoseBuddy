@@ -1,7 +1,7 @@
 name: Build
 
+# Pull requests only (and by hand); pushes don't build.
 on:
-  push:
   pull_request:
   workflow_dispatch:
 

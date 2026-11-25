@@ -1,14 +1,11 @@
 name: Windows
 
+# Pull requests only (and by hand); pushes don't build.
 on:
-  push:
-    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
   pull_request:
     paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
   workflow_dispatch:
 
-# Keep in step with windows-release.yml: cargo fingerprints include these, so
-# a mismatch would make the release build ignore the cache saved here.
 env:
   # No debug symbols in CI builds: smaller, faster to link (no huge .pdb
   # files), and smaller caches. Tests and panics still report file and line.
@@ -69,34 +66,3 @@ jobs:
         working-directory: windows/app/src-tauri
       - run: cargo clippy -- -D warnings
         working-directory: windows/app/src-tauri
-
-  release-cache:
-    # On main only: build exactly what windows-release.yml builds (core tests,
-    # the Tauri release binary) and save it under the shared key that workflow
-    # restores. Tag builds can only read caches made on the default branch, so
-    # without this every release compiles ~400 crates from scratch.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: windows/app/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: qcbuddy-release
-          workspaces: |
-            windows/core
-            windows/app/src-tauri
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
-      - name: Core tests (built, not run)
-        working-directory: windows/core
-        run: cargo test --no-run
-      - name: Release build, same flags as the installer, without bundling
-        working-directory: windows/app
-        run: |
-          npm ci
-          npx tauri build --no-bundle
