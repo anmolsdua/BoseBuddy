@@ -1053,17 +1053,18 @@ final class BoseController: ObservableObject {
             let packets = BmapPacket.parseAll(try await request.value)
             if let reply = packets.first(where: { $0.fblock == fblock && $0.function == function && $0.op == .error }) {
                 let code = reply.payload.first ?? 0
-                logFailure("request \(fblock).\(function) \(op) -> device error \(code) (\(BmapError.name(code)))")
+                logFailure(RequestDescription.deviceError(fblock: fblock, function: function, op: op, code: code))
             }
             return packets
         } catch {
-            logFailure("request \(fblock).\(function) \(op) failed after "
-                       + String(format: "%.1fs", Date().timeIntervalSince(started)) + ": \(error)")
+            logFailure(RequestDescription.failure(fblock: fblock, function: function, op: op, error: error,
+                                                  seconds: Date().timeIntervalSince(started)))
             throw error
         }
     }
 
     private func logFailure(_ line: String) {
+        // Durations vary, so leave them out of the "already logged" key.
         guard loggedFailures.insert(line.replacingOccurrences(of: #" after [0-9.]+s"#, with: "",
                                                               options: .regularExpression)).inserted else { return }
         BarLog.write(line)
