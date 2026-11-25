@@ -21,8 +21,11 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
 
 1. Bump the version in `app/src-tauri/tauri.conf.json`, `app/package.json`
    (`npm version x.y.z --no-git-tag-version`), `app/src-tauri/Cargo.toml` and
-   `core/Cargo.toml`; update `RELEASE_NOTES.md`. Merge to `main` via a pull
-   request.
+   `core/Cargo.toml`; add a `## X.Y.Z` section to `CHANGELOG.md` with only
+   what changed since the last release. Merge to `main` via a pull request.
+   The release page shows that section plus a short install footer
+   (`app/scripts/release-notes.mjs`); the release fails early if the section
+   is missing.
 2. Tag the merge commit on `main`: `git tag -a qcbuddy-vX.Y.Z -m "QC Buddy X.Y.Z (Windows)"`
    and push the tag. `windows-release.yml` checks the versions, runs the
    tests, builds and signs the installer, and creates a **draft**

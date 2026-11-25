@@ -65,6 +65,11 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Release notes from CHANGELOG.md
+        # Only this version's changes, plus the install footer. Fails here,
+        # before the build, if the changelog has no section for this version.
+        run: node windows/app/scripts/release-notes.mjs --version ${{ steps.version.outputs.version }} --changelog windows/CHANGELOG.md --repo ${{ github.repository }} --out release-notes.md
+
       - name: Core tests
         working-directory: windows/core
         run: cargo test
@@ -112,6 +117,6 @@ jobs:
           gh release create "${{ github.ref_name }}" `
             --draft --prerelease `
             --title "QC Buddy $version (Windows)" `
-            --notes-file windows/RELEASE_NOTES.md `
+            --notes-file release-notes.md `
             "dist/QCBuddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe.sig" `
             dist/latest-windows.json dist/SHA256SUMS.txt
