@@ -40,6 +40,9 @@ final class BoseController: ObservableObject {
     private var modesLoad: Task<Void, Never>?
     /// Tail of the request queue; each exchange waits for the one before it.
     private var exchangeTail: Task<Void, Never>?
+    /// Request failures already logged this connection, so a feature the
+    /// headphones don't support doesn't log on every poll.
+    private var loggedFailures: Set<String> = []
     @Published private(set) var eqBands: [EQBand] = []
     @Published private(set) var multipoint = false
     @Published private(set) var sidetone = 0
@@ -62,7 +65,11 @@ final class BoseController: ObservableObject {
     @Published var peerAction: String?
     @Published private(set) var actionNote: String?
     @Published private(set) var pendingSwitch: PeerSwitch?
-    @Published var errorText: String?
+    @Published var errorText: String? {
+        didSet {
+            if let errorText, errorText != oldValue { BarLog.write("error shown: \(errorText)") }
+        }
+    }
     @Published var showBatteryInMenuBar: Bool {
         didSet {
             UserDefaults.standard.set(showBatteryInMenuBar, forKey: Self.batteryMenuBarKey)
@@ -142,6 +149,7 @@ final class BoseController: ObservableObject {
                 // Modes can be added, edited or deleted from the Bose app.
                 await readModeIndex()
                 await loadModes()
+                logHealth()
             }
         } else if linkState != .connecting,
                   headphones.contains(where: { $0.connected }) || (audioAvailable && !headphones.isEmpty) {
@@ -250,6 +258,10 @@ final class BoseController: ObservableObject {
                 deviceName = clean
             }
             firmware = (try? await readFirmware()) ?? ""
+            loggedFailures = []
+            BarLog.write("session: BoseBuddy \(Self.appVersion) · macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+                         + " · \(productName.isEmpty ? deviceName : productName) fw \(firmware.isEmpty ? "?" : firmware)"
+                         + " · channel \(channel)")
             await refresh(deep: true)
         } catch {
             newLink.close()
@@ -753,6 +765,7 @@ final class BoseController: ObservableObject {
             let packets = try await exchange(31, 3, op: .start,
                                              payload: [UInt8(index), 1], timeout: 3.0)
             try ensureOK(packets, fblock: 31, function: 3)
+            BarLog.write("mode -> \(modes.first(where: { $0.index == index })?.name ?? "\(index)")")
             try await Task.sleep(nanoseconds: 250_000_000)
             await readModeIndex()
         } catch {
@@ -770,6 +783,7 @@ final class BoseController: ObservableObject {
         do {
             let packets = try await exchange(1, 10, op: .setGet, payload: [enabled ? 1 : 0])
             try ensureOK(packets, fblock: 1, function: 10)
+            BarLog.write("multipoint -> \(enabled ? "on" : "off")")
             try await Task.sleep(nanoseconds: 200_000_000)
             await loadMultipoint()
             await loadPeers()
@@ -792,6 +806,7 @@ final class BoseController: ObservableObject {
                                              payload: [UInt8(bitPattern: Int8(clamping: clamped)),
                                                        UInt8(band.bandID)])
             try ensureOK(packets, fblock: 1, function: 7)
+            BarLog.write("EQ \(band.name) -> \(clamped)")
             await loadEQ()
         } catch {
             errorText = message(for: error)
@@ -818,6 +833,7 @@ final class BoseController: ObservableObject {
                                                            UInt8(band.bandID)])
                 try ensureOK(packets, fblock: 1, function: 7)
             }
+            BarLog.write("EQ preset -> \(values.map(String.init).joined(separator: "/"))")
         } catch {
             errorText = message(for: error)
         }
@@ -832,6 +848,7 @@ final class BoseController: ObservableObject {
         do {
             let packets = try await exchange(1, 11, op: .setGet, payload: [1, UInt8(level)])
             try ensureOK(packets, fblock: 1, function: 11)
+            BarLog.write("sidetone -> \(level)")
             await loadSidetone()
         } catch {
             errorText = message(for: error)
@@ -972,8 +989,25 @@ final class BoseController: ObservableObject {
 
     func powerOff() async {
         guard linkState.isConnected else { return }
+        BarLog.write("power off requested")
         _ = try? await exchange(7, 4, op: .start, payload: [0], expectReply: false, timeout: 0.5)
         disconnect()
+    }
+
+    /// One-line snapshot for the log, written when the popover opens.
+    private func logHealth() {
+        let mode = modes.first(where: { $0.index == modeIndex })
+        let devices = peers.filter(\.connected).map(\.displayName)
+        BarLog.write("health: battery \(battery.map { "\($0)%" } ?? "?")\(charging ? " charging" : "")"
+                     + " · mode \(mode.map { "\($0.name) (\($0.ancLabel))" } ?? "?")"
+                     + " · EQ \(eqValues.map(String.init).joined(separator: "/"))"
+                     + " · sidetone \(sidetone) · multipoint \(multipoint ? "on" : "off")"
+                     + " · audio \(audioAvailable ? "yes" : "no")"
+                     + " · devices \(devices.isEmpty ? "-" : devices.joined(separator: ", "))")
+    }
+
+    private static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -1014,7 +1048,26 @@ final class BoseController: ObservableObject {
                                        drain: drain, timeout: timeout)
         }
         exchangeTail = Task { _ = try? await request.value }
-        return BmapPacket.parseAll(try await request.value)
+        let started = Date()
+        do {
+            let packets = BmapPacket.parseAll(try await request.value)
+            if let reply = packets.first(where: { $0.fblock == fblock && $0.function == function && $0.op == .error }) {
+                let code = reply.payload.first ?? 0
+                logFailure(RequestDescription.deviceError(fblock: fblock, function: function, op: op, code: code))
+            }
+            return packets
+        } catch {
+            logFailure(RequestDescription.failure(fblock: fblock, function: function, op: op, error: error,
+                                                  seconds: Date().timeIntervalSince(started)))
+            throw error
+        }
+    }
+
+    private func logFailure(_ line: String) {
+        // Durations vary, so leave them out of the "already logged" key.
+        guard loggedFailures.insert(line.replacingOccurrences(of: #" after [0-9.]+s"#, with: "",
+                                                              options: .regularExpression)).inserted else { return }
+        BarLog.write(line)
     }
 
     private func get(_ fblock: UInt8, _ function: UInt8, payload: [UInt8] = [],

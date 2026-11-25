@@ -230,8 +230,13 @@ See **[INSTALL.md](INSTALL.md)**. Right-click **Open**, or use **System
 Settings → Privacy & Security → Open Anyway**. Do not click **Move to Trash**.
 
 **Diagnostics.**
-BoseBuddy writes a capped log to `~/Library/Logs/BoseBuddy.log` with connection,
-peer, and audio-profile transitions.
+BoseBuddy writes a capped log to `~/Library/Logs/BoseBuddy.log` (the previous
+file is kept as `BoseBuddy.log.1`). It records connection, peer, and
+audio-profile transitions, a session header (app, macOS, model, firmware),
+every error shown in the app, failed requests to the headphones, settings you
+change (EQ, modes, sidetone, multipoint), and a one-line health snapshot each
+time the menu opens. The log contains your device names (for example your
+phone's name); redact them before attaching the log to a public issue.
 
 ## Build from source
 

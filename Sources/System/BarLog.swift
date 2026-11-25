@@ -1,6 +1,7 @@
 import Foundation
 
-/// Tiny append-only log at ~/Library/Logs/BoseBuddy.log. Useful for diagnosing
+/// Tiny append-only log at ~/Library/Logs/BoseBuddy.log (previous file kept
+/// as BoseBuddy.log.1). Useful for diagnosing
 /// Bluetooth/audio state changes without attaching a debugger.
 enum BarLog {
     private static let queue = DispatchQueue(label: "com.bosebuddy.app.log")
@@ -22,7 +23,10 @@ enum BarLog {
                                                         withIntermediateDirectories: true)
                 if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
                    let size = attributes[.size] as? Int, size > Self.maxSize {
-                    try? FileManager.default.removeItem(at: url)
+                    // Keep the previous file so history before a bug survives.
+                    let previous = url.appendingPathExtension("1")
+                    try? FileManager.default.removeItem(at: previous)
+                    try? FileManager.default.moveItem(at: url, to: previous)
                 }
                 if FileManager.default.fileExists(atPath: url.path) {
                     let handle = try FileHandle(forWritingTo: url)
