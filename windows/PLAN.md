@@ -78,8 +78,21 @@ captured test fixtures. The macOS app is unchanged.
 ## Architecture
 
 - **One request at a time.** A single worker owns the RFCOMM socket and
-  processes a queue (mpsc). This carries over the macOS fix where overlapping
-  requests read each other's replies.
+  processes a bounded queue (8 commands; beyond that the UI is told the app
+  is busy). This carries over the macOS fix where overlapping requests read
+  each other's replies. A panic in one command is logged and shown as an
+  error; quitting skips queued commands and waits at most 1 s.
+- **Only the reply to this request counts.** The transport reads until a
+  packet for the request's own block/function arrives (notifications don't
+  end the read), and reads and writes fail with "no response" otherwise.
+  BMAP has no request IDs, so a late reply to the *same* function can't be
+  told apart; leftovers are dropped before each send.
+- **Connecting has a deadline.** A channel must connect within 6 s and
+  answer a protocol-version probe; a timeout means the headset is
+  unreachable, so the other channels aren't tried.
+- **The flyout never shows a stale state.** Every published state has a
+  revision; the flyout subscribes first, then fetches the snapshot, and
+  ignores anything older.
 - **GetAll (31.1) is single-flight** and accepted only when its 31.1 RESULT
   arrives; retry up to 3x, keep the last good list.
 - **Polling.** Battery/source/mode every 15 s only while the flyout is open;

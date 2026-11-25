@@ -41,6 +41,11 @@ export function sent(): Command[] {
   return invokeMock.mock.calls.filter(([name]) => name === "send").map(([, args]) => (args as { command: Command }).command);
 }
 
+/** What the app emits and get_state returns. */
+export function snapshot(s: AppState, revision = 1) {
+  return { revision, state: s };
+}
+
 /** Deliver a Tauri event to the UI, as the worker does. */
 export function emit(name: string, payload: unknown) {
   const listeners = (globalThis as { __tauriListeners?: Map<string, (e: { payload: unknown }) => void> }).__tauriListeners!;

@@ -69,6 +69,12 @@ export interface AppState {
   error: string | null;
 }
 
+/** What the app emits: the state with a revision that only goes up. */
+export interface Snapshot {
+  revision: number;
+  state: AppState;
+}
+
 export interface PeerSwitch {
   target: Peer;
   candidates: Peer[];

@@ -58,6 +58,18 @@ pub struct FakeState {
     pub bmap_channel: u8,
     /// Requests rejected when written (SETGET / START answered with error 6).
     pub reject_writes: Vec<(u8, u8)>,
+    /// Packets the headset sends on its own; delivered ahead of the reply to
+    /// the next request (or to the next `unsolicited_with` request).
+    pub unsolicited: Vec<Packet>,
+    pub unsolicited_with: Option<(u8, u8)>,
+    /// Requests answered only with a packet for another function (a misrouted reply).
+    pub misreply: Vec<(u8, u8)>,
+    /// How long each request takes (a slow Bluetooth link).
+    pub delay: Duration,
+    /// A request that hits a bug in the controller's path (the fake panics).
+    pub panic_on: Option<(u8, u8)>,
+    /// Channels the controller tried to connect, in order.
+    pub connect_attempts: Vec<u8>,
     /// Every request received, in order.
     pub requests: Vec<Packet>,
 }
@@ -108,6 +120,12 @@ impl Default for FakeState {
             taken_channels: Vec::new(),
             bmap_channel: 8,
             reject_writes: Vec::new(),
+            unsolicited: Vec::new(),
+            unsolicited_with: None,
+            misreply: Vec::new(),
+            delay: Duration::ZERO,
+            panic_on: None,
+            connect_attempts: Vec::new(),
             requests: Vec::new(),
         }
     }
@@ -137,6 +155,9 @@ impl FakeState {
         }
         if self.silent.contains(&(p.fblock, p.function)) {
             return vec![];
+        }
+        if self.misreply.contains(&(p.fblock, p.function)) {
+            return vec![Packet::new(p.fblock, p.function.wrapping_add(100), Op::Status, &[0xEE])];
         }
         if matches!(p.op, Op::SetGet | Op::Start) && self.reject_writes.contains(&(p.fblock, p.function)) {
             return error(6);
@@ -314,7 +335,20 @@ impl Transport for FakeLink {
             // Connected, but nothing on this channel speaks BMAP.
             return if expect_reply { Err(BmapError::Timeout) } else { Ok(Vec::new()) };
         }
-        let mut out = Vec::new();
+        let first = parse_all(request).first().map(|p| (p.fblock, p.function));
+        if !state.delay.is_zero() {
+            let delay = state.delay;
+            drop(state);
+            std::thread::sleep(delay);
+            state = self.headset.state();
+        }
+        if first.is_some() && first == state.panic_on {
+            state.panic_on = None;
+            drop(state);
+            panic!("simulated bug handling {first:?}");
+        }
+        let deliver = state.unsolicited_with.is_none_or(|want| Some(want) == first);
+        let mut out: Vec<u8> = if deliver { state.unsolicited.drain(..).flat_map(|p| p.encode()).collect() } else { Vec::new() };
         for packet in parse_all(request) {
             state.requests.push(packet.clone());
             for reply in state.respond(&packet) {
@@ -350,8 +384,10 @@ impl Platform for FakeHeadset {
     fn open(&mut self, address: &str, channels: &[u8]) -> Result<Box<dyn Transport>, BmapError> {
         crate::transport::open_first_answering(channels, |channel| {
             let mut state = self.state();
+            state.connect_attempts.push(channel);
             if address != HEADSET_ADDRESS || state.powered_off {
-                return Err(BmapError::Transport("connect timed out".into()));
+                // Off or out of range: the connect gets no answer at all.
+                return Err(BmapError::Timeout);
             }
             if state.taken_channels.contains(&channel) {
                 return Err(BmapError::Transport("connection refused".into()));

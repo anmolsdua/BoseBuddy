@@ -296,12 +296,16 @@ fn worker_serializes_commands_and_reports_state() {
     let worker = Worker::spawn(Controller::new(Box::new(headset.clone()), Log::memory()), move |s| {
         sink.lock().unwrap().push(s.mode_index);
     });
-    worker.send(Command::Start);
-    worker.send(Command::SetMode(1));
-    worker.send(Command::SetMode(2));
-    drop(worker); // joins after the queued commands
+    worker.send(Command::Start).unwrap();
+    worker.send(Command::SetMode(1)).unwrap();
+    worker.send(Command::SetMode(2)).unwrap();
+    // Commands run in order on the worker; wait for the last one's effect.
+    wait_for(|| seen.lock().unwrap().last().copied().flatten() == Some(2));
     assert_eq!(headset.state().mode_index, 2);
-    assert_eq!(seen.lock().unwrap().last().copied().flatten(), Some(2));
+    let modes = seen.lock().unwrap().clone();
+    let first_two = modes.iter().position(|m| *m == Some(2)).unwrap();
+    assert!(modes[..first_two].contains(&Some(1)), "1 was set before 2: {modes:?}");
+    drop(worker);
 }
 
 #[test]
@@ -533,13 +537,13 @@ fn worker_polls_while_open_and_ticks_while_closed() {
     let headset = FakeHeadset::new(FakeState::default());
     let timing = Timing { poll: Duration::from_millis(20), tick: Duration::from_millis(20), battery_every: 2 };
     let worker = Worker::spawn_with(Controller::new(Box::new(headset.clone()), Log::memory()), timing, |_| {});
-    worker.send(Command::Start);
-    worker.send(Command::FlyoutOpened);
+    worker.send(Command::Start).unwrap();
+    worker.send(Command::FlyoutOpened).unwrap();
     std::thread::sleep(Duration::from_millis(150));
     let open_polls = headset.state().request_log().iter().filter(|l| *l == "31.3 get").count();
     assert!(open_polls >= 3, "polls mode while open: {open_polls}");
 
-    worker.send(Command::FlyoutClosed);
+    worker.send(Command::FlyoutClosed).unwrap();
     std::thread::sleep(Duration::from_millis(30));
     headset.state().requests.clear();
     std::thread::sleep(Duration::from_millis(150));
@@ -658,4 +662,162 @@ fn changes_made_elsewhere_show_up_when_the_flyout_opens() {
     assert_eq!(c.state().mode_index, Some(2));
     let walk = c.state().current_mode().unwrap().clone();
     assert_eq!((walk.wind_block, walk.anc_level()), (false, 6));
+}
+
+// MARK: - Reply matching
+
+use crate::protocol::{Op as BmapOp, Packet as BmapPacket};
+
+#[test]
+fn a_notification_ahead_of_the_reply_isnt_taken_as_the_answer() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    // The headset announces a source change just as we ask for the battery.
+    headset.state().unsolicited.push(BmapPacket::new(5, 1, BmapOp::Status, &[0, 2, 1, 0x10, 0, 0, 0, 0, 3]));
+    headset.state().battery = 64;
+    c.read_battery();
+    assert_eq!(c.state().battery, Some(64));
+}
+
+#[test]
+fn a_late_reply_to_an_earlier_request_is_ignored() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    // A 2.2 (battery) reply that timed out earlier turns up during the mode read.
+    {
+        let mut fake = headset.state();
+        fake.unsolicited.push(BmapPacket::new(2, 2, BmapOp::Status, &[11, 0xFF, 0xFF, 0]));
+        fake.unsolicited_with = Some((31, 3));
+        fake.mode_index = 1;
+    }
+    c.poll(); // battery (2.2), source (5.1), then mode (31.3) with the stale packet
+    assert_eq!(c.state().mode_index, Some(1), "the mode read used its own reply");
+    assert_eq!(c.state().battery, Some(80), "the stale 11% isn't used for anything");
+}
+
+#[test]
+fn no_matching_reply_means_no_value() {
+    let (mut c, headset, log) = connected(FakeState::default());
+    {
+        let mut fake = headset.state();
+        fake.silent.push((2, 2));
+        fake.unsolicited.push(BmapPacket::new(5, 1, BmapOp::Status, &[0, 2, 0]));
+        fake.battery = 12;
+    }
+    c.read_battery();
+    assert_eq!(c.state().battery, Some(80), "kept, not replaced by the notification's bytes");
+    let lines = log.lines();
+    assert!(
+        lines.iter().any(|l| l == "Failed reading battery level: The headphones didn't return any data. [2.2 get]"),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_write_without_its_reply_is_a_failure() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().misreply.push((1, 11));
+    c.set_sidetone(3);
+    assert_eq!(c.state().error.as_deref(), Some("The headphones didn't return any data."));
+    assert_eq!(c.state().sidetone, 0, "reverted");
+    headset.state().misreply.push((31, 3));
+    c.set_mode(1);
+    assert_eq!(c.state().mode_index, Some(0), "reverted");
+}
+
+#[test]
+fn trace_logs_every_packet_in_hex() {
+    let (mut c, _, log) = connected(FakeState::default());
+    c.set_trace(true);
+    c.read_battery();
+    let lines = log.lines();
+    assert!(lines.contains(&"TX 2.2 get []".to_string()), "{lines:?}");
+    assert!(lines.contains(&"RX 2.2 status [50 ff ff 00]".to_string()), "{lines:?}");
+}
+
+// MARK: - Worker failure handling
+
+#[test]
+fn a_full_queue_says_busy_instead_of_piling_up() {
+    use crate::worker::{SendError, QUEUE_LIMIT};
+    use std::time::Duration;
+    let headset = FakeHeadset::new(FakeState { delay: Duration::from_millis(30), ..FakeState::default() });
+    let worker = Worker::spawn(Controller::new(Box::new(headset), Log::memory()), |_| {});
+    worker.send(Command::Start).unwrap(); // takes a while: every read is slow
+    let results: Vec<_> = (0..QUEUE_LIMIT + 5).map(|_| worker.send(Command::SetMode(1))).collect();
+    assert!(results.contains(&Err(SendError::Busy)), "{results:?}");
+    assert!(results.iter().filter(|r| r.is_ok()).count() <= QUEUE_LIMIT);
+    assert_eq!(
+        SendError::Busy.to_string(),
+        "QC Buddy is still working on earlier changes. Try again in a moment."
+    );
+}
+
+#[test]
+fn quitting_skips_queued_work_and_doesnt_wait_long() {
+    use std::time::{Duration, Instant};
+    let headset = FakeHeadset::new(FakeState { delay: Duration::from_millis(100), ..FakeState::default() });
+    let worker = Worker::spawn(Controller::new(Box::new(headset.clone()), Log::memory()), |_| {});
+    worker.send(Command::Start).unwrap(); // ~2 s of slow reads
+    for _ in 0..5 {
+        let _ = worker.send(Command::SetMode(1));
+    }
+    std::thread::sleep(Duration::from_millis(50));
+    let quitting = Instant::now();
+    drop(worker);
+    assert!(quitting.elapsed() < Duration::from_millis(1500), "waited {:?}", quitting.elapsed());
+    std::thread::sleep(Duration::from_millis(2500)); // let the abandoned Start finish
+    let switches = headset.state().request_log().iter().filter(|l| *l == "31.3 start").count();
+    assert_eq!(switches, 0, "queued mode switches never ran");
+}
+
+#[test]
+fn a_crashing_command_is_reported_and_the_worker_carries_on() {
+    use std::sync::{Arc, Mutex};
+    let headset = FakeHeadset::new(FakeState::default());
+    let errors: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let sink = errors.clone();
+    let log = Log::memory();
+    let worker = Worker::spawn(Controller::new(Box::new(headset.clone()), log.clone()), move |s| {
+        sink.lock().unwrap().push(s.error.clone());
+    });
+    worker.send(Command::Start).unwrap();
+    // Start reads sidetone too: arm the bug only once it's done (EQ is read last).
+    wait_for(|| headset.state().request_log().contains(&"1.7 get".to_string()));
+    headset.state().panic_on = Some((1, 11));
+    worker.send(Command::SetSidetone(2)).unwrap();
+    worker.send(Command::SetMode(1)).unwrap();
+    wait_for(|| headset.state().mode_index == 1);
+    drop(worker);
+    let errors = errors.lock().unwrap();
+    assert!(errors.iter().any(|e| e.as_deref() == Some("Something went wrong in QC Buddy. The details are in the log; try again.")));
+    assert!(log.lines().iter().any(|l| l.starts_with("internal error in SetSidetone(2): simulated bug handling")));
+}
+
+/// Wait up to 5 s for something the worker thread does.
+fn wait_for(mut done: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !done() {
+        assert!(std::time::Instant::now() < deadline, "timed out waiting for the worker");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn an_unreachable_headset_fails_after_one_channel_not_three() {
+    let headset = FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+    c.connect(Some(crate::fake::HEADSET_ADDRESS));
+    assert_eq!(headset.state().connect_attempts, [8], "no point trying 2 and 9");
+    assert_eq!(
+        c.state().error.as_deref(),
+        Some("The headphones didn't respond within 6 s. Make sure they're on, nearby and connected to this PC.")
+    );
+}
+
+#[test]
+fn a_refused_channel_still_tries_the_next() {
+    let headset = FakeHeadset::new(FakeState { taken_channels: vec![8], bmap_channel: 2, ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+    c.start();
+    assert_eq!(headset.state().connect_attempts, [8, 2]);
+    assert_eq!(c.state().channel, 2);
 }

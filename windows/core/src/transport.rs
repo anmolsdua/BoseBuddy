@@ -34,6 +34,8 @@ pub trait Transport: Send {
 
 /// How long a freshly opened channel gets to answer the protocol-version probe.
 pub const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
+/// How long connecting one RFCOMM channel may take before giving up.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// Open the first of `channels` that both connects and answers a BMAP
 /// request (0.1, protocol version). A channel can accept the connection and
@@ -51,6 +53,14 @@ where
                 Ok(bytes) if parse_all(&bytes).iter().any(|p| p.is(0, 1)) => return Ok(link),
                 _ => silent.push(channel),
             },
+            // No answer at all: the headset is out of reach or off, and the
+            // other channels would each wait just as long. Stop here.
+            Err(BmapError::Timeout) if silent.is_empty() => {
+                return Err(BmapError::Transport(format!(
+                    "The headphones didn't respond within {} s. Make sure they're on, nearby and connected to this PC.",
+                    CONNECT_TIMEOUT.as_secs()
+                )))
+            }
             Err(e) => refused.push(format!("channel {channel}: {e}")),
         }
     }
@@ -82,13 +92,14 @@ mod win {
 
     use windows::Win32::Devices::Bluetooth::{AF_BTH, BTHPROTO_RFCOMM, SOCKADDR_BTH};
     use windows::Win32::Networking::WinSock::{
-        closesocket, connect, ioctlsocket, recv, send, socket, WSACleanup, WSAGetLastError,
-        WSAStartup, FIONBIO, INVALID_SOCKET, SEND_RECV_FLAGS, SOCKADDR, SOCKET, SOCK_STREAM,
-        WSADATA, WSAEWOULDBLOCK,
+        closesocket, connect, getsockopt, ioctlsocket, recv, select, send, socket, WSACleanup,
+        WSAGetLastError, WSAStartup, FD_SET, FIONBIO, INVALID_SOCKET, SEND_RECV_FLAGS, SOCKADDR,
+        SOCKET, SOCK_STREAM, SOL_SOCKET, SO_ERROR, TIMEVAL, WSADATA, WSAEHOSTUNREACH, WSAETIMEDOUT,
+        WSAEWOULDBLOCK,
     };
 
-    use super::Transport;
-    use crate::protocol::{is_complete, BmapError};
+    use super::{Transport, CONNECT_TIMEOUT};
+    use crate::protocol::{has_reply_to, BmapError};
 
     pub struct WinRfcomm {
         sock: SOCKET,
@@ -104,18 +115,15 @@ mod win {
             if rc != 0 {
                 return Err(BmapError::Transport(format!("Windows sockets failed to start ({rc}).")));
             }
-            let mut errors = Vec::new();
+            let mut last = BmapError::NotConnected;
             for &channel in channels {
                 match open_channel(address, channel) {
                     Ok(sock) => return Ok(WinRfcomm { sock, channel, closed: false }),
-                    Err(e) => errors.push(format!("channel {channel}: {e}")),
+                    Err(e) => last = e,
                 }
             }
             unsafe { WSACleanup() };
-            Err(BmapError::Transport(format!(
-                "Couldn't open the Bluetooth control channel ({}). Make sure the headphones are on and connected to this PC.",
-                errors.join("; ")
-            )))
+            Err(last)
         }
 
         /// Bytes waiting right now, without blocking.
@@ -159,12 +167,28 @@ mod win {
         }
     }
 
-    fn open_channel(address: u64, channel: u8) -> Result<SOCKET, String> {
+    /// Connect with a deadline: non-blocking connect, then wait for the
+    /// socket to become writable. A blocking connect waits for Windows' own
+    /// timeout (about 20 s per channel).
+    fn open_channel(address: u64, channel: u8) -> Result<SOCKET, BmapError> {
+        let fail = |what: &str, sock: Option<SOCKET>| {
+            let err = unsafe { WSAGetLastError() };
+            if let Some(sock) = sock {
+                unsafe {
+                    let _ = closesocket(sock);
+                }
+            }
+            BmapError::Transport(format!("{what} {err:?}"))
+        };
         unsafe {
             let sock = socket(AF_BTH as i32, SOCK_STREAM, BTHPROTO_RFCOMM as i32)
-                .map_err(|e| format!("socket: {e}"))?;
+                .map_err(|e| BmapError::Transport(format!("socket: {e}")))?;
             if sock == INVALID_SOCKET {
-                return Err(format!("socket: {:?}", WSAGetLastError()));
+                return Err(fail("socket", None));
+            }
+            let mut nonblocking: u32 = 1;
+            if ioctlsocket(sock, FIONBIO, &mut nonblocking) != 0 {
+                return Err(fail("ioctlsocket", Some(sock)));
             }
             let addr = SOCKADDR_BTH {
                 addressFamily: AF_BTH,
@@ -177,16 +201,33 @@ mod win {
                 &addr as *const SOCKADDR_BTH as *const SOCKADDR,
                 std::mem::size_of::<SOCKADDR_BTH>() as i32,
             );
-            if rc != 0 {
-                let err = WSAGetLastError();
-                let _ = closesocket(sock);
-                return Err(format!("connect {err:?}"));
+            if rc == 0 {
+                return Ok(sock);
             }
-            let mut nonblocking: u32 = 1;
-            if ioctlsocket(sock, FIONBIO, &mut nonblocking) != 0 {
-                let err = WSAGetLastError();
+            if WSAGetLastError() != WSAEWOULDBLOCK {
+                return Err(fail("connect", Some(sock)));
+            }
+            let mut writable = FD_SET { fd_count: 1, ..Default::default() };
+            writable.fd_array[0] = sock;
+            let mut failed = FD_SET { fd_count: 1, ..Default::default() };
+            failed.fd_array[0] = sock;
+            let limit = TIMEVAL { tv_sec: CONNECT_TIMEOUT.as_secs() as i32, tv_usec: 0 };
+            let ready = select(0, None, Some(&mut writable), Some(&mut failed), Some(&limit));
+            if ready == 0 {
                 let _ = closesocket(sock);
-                return Err(format!("ioctlsocket {err:?}"));
+                return Err(BmapError::Timeout);
+            }
+            if ready < 0 || failed.fd_count > 0 {
+                let mut code: i32 = 0;
+                let mut len = std::mem::size_of::<i32>() as i32;
+                let _ = getsockopt(sock, SOL_SOCKET, SO_ERROR, windows::core::PSTR(&mut code as *mut i32 as *mut u8), &mut len);
+                let _ = closesocket(sock);
+                // Windows' Bluetooth stack times out paging the device itself
+                // (~5 s) before our deadline: the headset is just as unreachable.
+                if code == WSAETIMEDOUT.0 || code == WSAEHOSTUNREACH.0 {
+                    return Err(BmapError::Timeout);
+                }
+                return Err(BmapError::Transport(format!("connect error {code}")));
             }
             Ok(sock)
         }
@@ -217,7 +258,9 @@ mod win {
             while Instant::now() < deadline {
                 if self.read_available(&mut buffer)? > 0 {
                     last_data = Instant::now();
-                    if !drain && is_complete(&buffer) {
+                    // Wait for the reply to this request; a notification
+                    // that arrives first mustn't end the read.
+                    if !drain && has_reply_to(&buffer, request) {
                         break;
                     }
                 }

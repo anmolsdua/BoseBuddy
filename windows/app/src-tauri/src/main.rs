@@ -6,7 +6,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use qcbuddy_core::eq_presets::EqPreset;
@@ -20,6 +20,9 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WindowEvent};
 
 mod presets;
+mod snapshot;
+
+use snapshot::{Latest, Snapshot};
 
 const FLYOUT: &str = "flyout";
 const TRAY: &str = "main";
@@ -29,7 +32,7 @@ const MARGIN: f64 = 12.0;
 
 struct AppState {
     worker: Worker,
-    latest: Mutex<Option<State>>,
+    latest: Arc<Latest>,
     /// When the flyout last hid on losing focus. A tray click that arrives
     /// right after is the same click, so it shouldn't reopen the flyout.
     hidden_at: Mutex<Option<Instant>>,
@@ -39,14 +42,16 @@ struct AppState {
     tray_battery: Mutex<Option<Option<u8>>>,
 }
 
+/// The newest snapshot. The flyout calls this after subscribing to `state`.
 #[tauri::command]
-fn get_state(app: tauri::State<'_, AppState>) -> Option<State> {
-    app.latest.lock().ok()?.clone()
+fn get_state(app: tauri::State<'_, AppState>) -> Option<Snapshot> {
+    app.latest.get()
 }
 
+/// Queue a command; the flyout shows the error if the worker is busy or stopped.
 #[tauri::command]
-fn send(command: Command, app: tauri::State<'_, AppState>) {
-    app.worker.send(command);
+fn send(command: Command, app: tauri::State<'_, AppState>) -> Result<(), String> {
+    app.worker.send(command).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -113,10 +118,12 @@ fn main() {
             let handle = app.handle().clone();
             let controller = Controller::new(platform(), Log::file(default_path()));
             let emitter = handle.clone();
-            let worker = Worker::spawn(controller, move |state: &State| publish(&emitter, state));
+            let latest = Arc::new(Latest::default());
+            let recorder = latest.clone();
+            let worker = Worker::spawn(controller, move |state: &State| publish(&emitter, &recorder, state));
             app.manage(AppState {
                 worker,
-                latest: Mutex::new(None),
+                latest,
                 hidden_at: Mutex::new(None),
                 light_taskbar: light_taskbar(),
                 tray_battery: Mutex::new(None),
@@ -134,7 +141,8 @@ fn main() {
                     _ => {}
                 });
             }
-            handle.state::<AppState>().worker.send(Command::Start);
+            // A fresh worker's queue is empty, so this can't be refused.
+            let _ = handle.state::<AppState>().worker.send(Command::Start);
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -155,13 +163,11 @@ fn platform() -> Box<dyn Platform> {
     }
 }
 
-/// Called on the worker thread with every state change.
-fn publish(app: &AppHandle, state: &State) {
-    let _ = app.emit("state", state);
+/// Called on the worker thread with every state change: record it as the
+/// next revision, then emit it, then update the tray.
+fn publish(app: &AppHandle, latest: &Latest, state: &State) {
+    let _ = app.emit("state", latest.record(state));
     let Some(shared) = app.try_state::<AppState>() else { return };
-    if let Ok(mut latest) = shared.latest.lock() {
-        *latest = Some(state.clone());
-    }
     let Some(tray) = app.tray_by_id(TRAY) else { return };
     let _ = tray.set_tooltip(Some(tooltip(state)));
     let battery = if state.link.is_connected() { state.battery } else { None };
@@ -290,7 +296,8 @@ fn show(app: &AppHandle) {
     place(&window);
     let _ = window.show();
     let _ = window.set_focus();
-    app.state::<AppState>().worker.send(Command::FlyoutOpened);
+    // If the worker is busy the flyout shows the last state; it updates when the queue drains.
+    let _ = app.state::<AppState>().worker.send(Command::FlyoutOpened);
 }
 
 fn hide(app: &AppHandle) {
@@ -303,7 +310,7 @@ fn hide(app: &AppHandle) {
     if let Ok(mut hidden_at) = state.hidden_at.lock() {
         *hidden_at = Some(Instant::now());
     }
-    state.worker.send(Command::FlyoutClosed);
+    let _ = state.worker.send(Command::FlyoutClosed);
 }
 
 /// Bottom-right of the work area of the monitor under the cursor (where the

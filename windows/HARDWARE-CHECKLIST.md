@@ -25,6 +25,8 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 5 | Notices the headset turning off; flyout says Not connected | App running, headset off | |
 | 6 | Reconnects after the PC sleeps | Sleep, wake, open the flyout | |
 | 6a | A second client (CLI while the app runs) is told the headset is busy, quickly, instead of hanging | `qcbuddy status` with the app running | 2026-11-25 |
+| 6b | An unreachable headset fails within ~6 s, after one channel | `qcbuddy --address 10:00:00:00:00:99 status` | 2026-11-25 (5.4 s) |
+| 6c | Every write gets the reply the core requires (`QCBUDDY_TRACE=1`, check TX/RX in the log) | Mode switch, mode edit, EQ, sidetone: 2026-11-25. Still to trace: pairing (4.8), multipoint (1.10) | partly |
 
 ## Noise control
 

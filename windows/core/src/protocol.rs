@@ -221,6 +221,21 @@ pub fn product_name(payload: &[u8]) -> String {
     }
 }
 
+/// Whether `data` holds a whole reply to `request` (same fblock and
+/// function). Other packets, like notifications the headset sends on its
+/// own, don't end the wait.
+pub fn has_reply_to(data: &[u8], request: &[u8]) -> bool {
+    match request {
+        [fblock, function, ..] => parse_all(data).iter().any(|p| p.is(*fblock, *function)),
+        _ => is_complete(data),
+    }
+}
+
+/// The reply to `fblock.function` among `packets`, if any.
+pub fn reply_to(packets: &[Packet], fblock: u8, function: u8) -> Option<&Packet> {
+    packets.iter().find(|p| p.is(fblock, function))
+}
+
 pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(" ")
 }
@@ -258,6 +273,19 @@ mod tests {
         assert!(!is_complete(&two[..two.len() - 1]));
         assert!(!is_complete(&[]));
         assert_eq!(parse_all(&two[..two.len() - 1]).len(), 1);
+    }
+
+    #[test]
+    fn waiting_for_the_reply_to_this_request() {
+        let request = Packet::new(2, 2, Op::Get, &[]).encode();
+        let notification = Packet::new(5, 1, Op::Status, &[0, 2, 1, 1, 2, 3, 4, 5, 6]).encode();
+        let reply = Packet::new(2, 2, Op::Status, &[80]).encode();
+        assert!(!has_reply_to(&notification, &request), "a notification alone doesn't end the wait");
+        let both = [notification.clone(), reply.clone()].concat();
+        assert!(has_reply_to(&both, &request));
+        assert!(!has_reply_to(&both[..both.len() - 1], &request), "a partial reply doesn't either");
+        assert_eq!(reply_to(&parse_all(&both), 2, 2).unwrap().payload, [80]);
+        assert!(reply_to(&parse_all(&notification), 2, 2).is_none());
     }
 
     #[test]

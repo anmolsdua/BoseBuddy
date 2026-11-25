@@ -1,28 +1,44 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { HeadphonesIcon, send } from "./controls";
+import { HeadphonesIcon, send, SEND_ERROR_EVENT } from "./controls";
 import { DevicesCard } from "./DevicesCard";
 import { EqCard } from "./EqCard";
 import { NoiseCard } from "./NoiseCard";
-import { audioDevices, type AppState, type EqPreset } from "./types";
+import { audioDevices, type AppState, type EqPreset, type Snapshot } from "./types";
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [presets, setPresets] = useState<EqPreset[]>([]);
+  const [sendError, setSendError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    invoke<AppState | null>("get_state").then((s) => s && setState(s));
+    // Subscribe first, then ask for the snapshot: nothing published in
+    // between is missed. Revisions only go up, so whichever arrives last,
+    // an older state never replaces a newer one.
+    let shown = 0;
+    let disposed = false;
+    const apply = (snapshot: Snapshot | null) => {
+      if (!disposed && snapshot && snapshot.revision > shown) {
+        shown = snapshot.revision;
+        setState(snapshot.state);
+      }
+    };
+    const unlisten = listen<Snapshot>("state", (e) => apply(e.payload));
+    unlisten.then(() => invoke<Snapshot | null>("get_state").then(apply));
+    const onSendError = (e: Event) => setSendError((e as CustomEvent<string>).detail);
+    window.addEventListener(SEND_ERROR_EVENT, onSendError);
     // Presets live in a file the CLI can change too: re-read whenever the flyout shows.
     const loadPresets = () => invoke<EqPreset[] | null>("presets").then((p) => p && setPresets(p));
     loadPresets();
     window.addEventListener("focus", loadPresets);
-    const unlisten = listen<AppState>("state", (e) => setState(e.payload));
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && invoke("hide_flyout");
     window.addEventListener("keydown", onKey);
     return () => {
+      disposed = true;
       unlisten.then((f) => f());
+      window.removeEventListener(SEND_ERROR_EVENT, onSendError);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("focus", loadPresets);
     };
@@ -40,7 +56,17 @@ export function App() {
 
   return (
     <div className="flyout" ref={root}>
-      {state ? <Flyout state={state} presets={presets} onPresets={setPresets} /> : <div className="loading">Starting…</div>}
+      {state ? (
+        <Flyout
+          state={state}
+          presets={presets}
+          onPresets={setPresets}
+          sendError={sendError}
+          onDismissSendError={() => setSendError(null)}
+        />
+      ) : (
+        <div className="loading">Starting…</div>
+      )}
     </div>
   );
 }
@@ -49,19 +75,26 @@ export function Flyout({
   state,
   presets = [],
   onPresets = () => {},
+  sendError = null,
+  onDismissSendError = () => {},
 }: {
   state: AppState;
   presets?: EqPreset[];
   onPresets?: (presets: EqPreset[]) => void;
+  /** A command the core refused (busy or stopped); shown before the core's own error. */
+  sendError?: string | null;
+  onDismissSendError?: () => void;
 }) {
+  const error = sendError ?? state.error;
+  const dismiss = () => (sendError ? onDismissSendError() : send({ type: "clearError" }));
   const connected = state.link.kind === "connected";
   return (
     <>
       <Header state={state} />
-      {state.error && (
+      {error && (
         <div className="error" role="alert">
-          <span>{state.error}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => send({ type: "clearError" })}>
+          <span>{error}</span>
+          <button type="button" aria-label="Dismiss" onClick={dismiss}>
             ×
           </button>
         </div>

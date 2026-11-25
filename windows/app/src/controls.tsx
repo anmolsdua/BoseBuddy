@@ -2,7 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Command, PeerKind } from "./types";
 
-export const send = (command: Command) => invoke("send", { command });
+export const SEND_ERROR_EVENT = "qcbuddy:send-error";
+
+/**
+ * Queue a command for the core. If it's refused (worker busy or stopped),
+ * the flyout shows why instead of the click silently doing nothing.
+ */
+export const send = (command: Command) =>
+  invoke("send", { command }).catch((e: unknown) => {
+    window.dispatchEvent(new CustomEvent(SEND_ERROR_EVENT, { detail: String(e) }));
+  });
 
 export function Toggle({
   on,

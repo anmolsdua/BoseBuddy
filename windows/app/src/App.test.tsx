@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App, Flyout } from "./App";
-import { emit, fixtures, invokeMock, sent, state } from "./test/helpers";
+import { listen } from "@tauri-apps/api/event";
+import type { Mock } from "vitest";
+import { emit, fixtures, invokeMock, sent, snapshot, state } from "./test/helpers";
 
 describe("Header", () => {
   it("shows the headset, battery and who has audio", () => {
@@ -88,17 +90,60 @@ describe("Flyout", () => {
 
 describe("App", () => {
   it("loads the current state, then follows state events", async () => {
-    invokeMock.mockImplementation((name: string) => Promise.resolve(name === "get_state" ? fixtures.connected : null));
+    invokeMock.mockImplementation((name: string) => Promise.resolve(name === "get_state" ? snapshot(fixtures.connected, 1) : null));
     render(<App />);
     expect(await screen.findByText("80%")).toBeTruthy();
-    emit("state", fixtures.lowBattery);
+    emit("state", snapshot(fixtures.lowBattery, 2));
     expect(screen.getByText("15%")).toBeTruthy();
-    emit("state", fixtures.disconnected);
+    emit("state", snapshot(fixtures.disconnected, 3));
     expect(screen.getByText("Not connected")).toBeTruthy();
   });
 
+  it("subscribes before asking for the snapshot, so no update is missed", async () => {
+    render(<App />);
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_state"));
+    const listenOrder = (listen as unknown as Mock).mock.invocationCallOrder[0];
+    const getStateOrder = invokeMock.mock.invocationCallOrder[invokeMock.mock.calls.findIndex(([n]) => n === "get_state")];
+    expect(listenOrder).toBeLessThan(getStateOrder);
+  });
+
+  it("never lets an older snapshot replace a newer event", async () => {
+    let resolveSnapshot: (s: unknown) => void = () => {};
+    invokeMock.mockImplementation((name: string) =>
+      name === "get_state" ? new Promise((r) => (resolveSnapshot = r)) : Promise.resolve(null),
+    );
+    render(<App />);
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_state"));
+    emit("state", snapshot(fixtures.lowBattery, 5)); // a change arrives first
+    expect(screen.getByText("15%")).toBeTruthy();
+    await act(async () => resolveSnapshot(snapshot(fixtures.connected, 4))); // then the older snapshot
+    expect(screen.getByText("15%")).toBeTruthy();
+    expect(screen.queryByText("80%")).toBeNull();
+    emit("state", snapshot(fixtures.connected, 5)); // same revision again: ignored too
+    expect(screen.getByText("15%")).toBeTruthy();
+  });
+
+  it("shows why a command was refused, and dismisses it locally", async () => {
+    invokeMock.mockImplementation((name: string) =>
+      name === "get_state"
+        ? Promise.resolve(snapshot(fixtures.connected))
+        : name === "send"
+          ? Promise.reject("QC Buddy is still working on earlier changes. Try again in a moment.")
+          : Promise.resolve(null),
+    );
+    render(<App />);
+    await screen.findByText("80%");
+    await userEvent.click(screen.getByRole("button", { name: "Aware" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("still working on earlier changes");
+    invokeMock.mockClear();
+    await userEvent.click(within(alert).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(sent(), "the core's error wasn't touched").toEqual([]);
+  });
+
   it("re-reads EQ presets whenever the flyout gets focus (the CLI may have saved one)", async () => {
-    invokeMock.mockImplementation((name: string) => Promise.resolve(name === "get_state" ? fixtures.connected : name === "presets" ? [] : null));
+    invokeMock.mockImplementation((name: string) => Promise.resolve(name === "get_state" ? snapshot(fixtures.connected) : name === "presets" ? [] : null));
     render(<App />);
     await screen.findByText("80%");
     const presetCalls = () => invokeMock.mock.calls.filter(([name]) => name === "presets").length;
