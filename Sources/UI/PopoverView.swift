@@ -620,6 +620,11 @@ struct PopoverView: View {
                     if model.busyAction?.hasPrefix("eq") == true {
                         ProgressView().controlSize(.mini)
                     }
+                    if model.supportsEQ, !model.eqBands.isEmpty {
+                        // Visible while collapsed, so the current sound is
+                        // clear without opening the card.
+                        presetBadge
+                    }
                 }
                 .foregroundStyle(.primary)
             }
@@ -653,6 +658,20 @@ struct PopoverView: View {
         }
         .padding(.vertical, 1)
         .disabled(model.busyAction != nil)
+    }
+
+    private var presetBadge: some View {
+        let preset = currentPreset
+        return HStack(spacing: 3) {
+            if let preset, !preset.isBuiltIn {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 8))
+            }
+            Text(preset?.name ?? "Custom")
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(preset == nil ? Color.secondary : Theme.accent)
     }
 
     /// Below the sliders: Save for unsaved values, Rename/Delete for a
