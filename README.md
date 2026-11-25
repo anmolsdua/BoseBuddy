@@ -28,6 +28,9 @@ It isn't code-signed yet, so on first run Windows SmartScreen shows "Windows
 protected your PC": click **More info**, then **Run anyway**. Source, build
 steps and status are in [`windows/`](windows/PLAN.md).
 
+<img width="359" height="745" alt="Screenshot 2026-11-25 at 6 01 57 PM" src="https://github.com/user-attachments/assets/5fe6b1c3-55c1-441f-abe7-ca88c2667a2a" />
+
+
 ## Why
 
 The Bose app is the only official place to manage the headphones’ paired
