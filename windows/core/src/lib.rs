@@ -21,3 +21,5 @@ pub use worker::{Command, Worker};
 
 #[cfg(test)]
 mod controller_tests;
+#[cfg(test)]
+mod ui_fixtures;

@@ -48,6 +48,10 @@ pub struct FakeState {
     pub incomplete_getalls: u32,
     /// Error code for the next CONNECT (4.1).
     pub connect_error: Option<u8>,
+    /// Requests the headset never answers (the controller times out).
+    pub silent: Vec<(u8, u8)>,
+    /// Devices stay connected after DISCONNECT (4.2), as a busy phone might.
+    pub ignore_disconnect: bool,
     /// Every request received, in order.
     pub requests: Vec<Packet>,
 }
@@ -93,6 +97,8 @@ impl Default for FakeState {
             unsupported: vec![(2, 3)],
             incomplete_getalls: 0,
             connect_error: None,
+            silent: Vec::new(),
+            ignore_disconnect: false,
             requests: Vec::new(),
         }
     }
@@ -119,6 +125,9 @@ impl FakeState {
         let error = |code: u8| vec![reply(Op::Error, vec![code])];
         if self.unsupported.contains(&(p.fblock, p.function)) {
             return error(4);
+        }
+        if self.silent.contains(&(p.fblock, p.function)) {
+            return vec![];
         }
         match (p.fblock, p.function, p.op) {
             (0, 1, Op::Get) => vec![status(b"1.1.0".to_vec())],
@@ -164,6 +173,7 @@ impl FakeState {
                     None => error(11),
                 }
             }
+            (4, 2, Op::Start) if self.ignore_disconnect => vec![reply(Op::Result, vec![])],
             (4, 2, Op::Start) => {
                 if let Some(peer) = self.peers.iter_mut().find(|x| x.mac[..] == p.payload[..]) {
                     peer.connected = false;

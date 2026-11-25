@@ -239,7 +239,7 @@ fn toggle(app: &AppHandle) {
         .lock()
         .ok()
         .and_then(|t| *t)
-        .is_some_and(|t| t.elapsed() < Duration::from_millis(300));
+        .is_some_and(|t| is_same_click(t, Instant::now()));
     if !just_hidden {
         show(app);
     }
@@ -276,10 +276,28 @@ fn place(window: &WebviewWindow) {
         .or_else(|| window.primary_monitor().ok().flatten());
     let (Some(monitor), Ok(size)) = (monitor, window.outer_size()) else { return };
     let area = monitor.work_area();
-    let margin = (MARGIN * monitor.scale_factor()).round() as i32;
-    let x = area.position.x + area.size.width as i32 - size.width as i32 - margin;
-    let y = area.position.y + area.size.height as i32 - size.height as i32 - margin;
-    let _ = window.set_position(PhysicalPosition::new(x.max(area.position.x), y.max(area.position.y)));
+    let (x, y) = flyout_origin(
+        (area.position.x, area.position.y, area.size.width, area.size.height),
+        (size.width, size.height),
+        monitor.scale_factor(),
+    );
+    let _ = window.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Top-left corner for the flyout: bottom-right of the work area (x, y, w, h,
+/// physical pixels), MARGIN logical pixels in, never off its top-left.
+fn flyout_origin(area: (i32, i32, u32, u32), size: (u32, u32), scale: f64) -> (i32, i32) {
+    let (ax, ay, aw, ah) = area;
+    let margin = (MARGIN * scale).round() as i32;
+    let x = ax + aw as i32 - size.0 as i32 - margin;
+    let y = ay + ah as i32 - size.1 as i32 - margin;
+    (x.max(ax), y.max(ay))
+}
+
+/// A tray click this soon after the flyout hid on losing focus is the click
+/// that took the focus: it should close the flyout, not reopen it.
+fn is_same_click(hidden_at: Instant, now: Instant) -> bool {
+    now.saturating_duration_since(hidden_at) < Duration::from_millis(300)
 }
 
 /// Windows' "SystemUsesLightTheme": the taskbar is light, so the tray icon must be dark.
@@ -311,6 +329,55 @@ fn light_taskbar() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use qcbuddy_core::fake::{FakeHeadset, FakeState};
+
+    #[test]
+    fn flyout_sits_above_the_taskbar_at_the_bottom_right() {
+        // 1920x1080 at 100%, taskbar 48 px at the bottom.
+        assert_eq!(flyout_origin((0, 0, 1920, 1032), (372, 500), 1.0), (1920 - 372 - 12, 1032 - 500 - 12));
+        // 150%: the margin scales too.
+        assert_eq!(flyout_origin((0, 0, 2880, 1548), (558, 750), 1.5), (2880 - 558 - 18, 1548 - 750 - 18));
+        // Second monitor to the left (negative coordinates).
+        assert_eq!(flyout_origin((-1920, 0, 1920, 1032), (372, 500), 1.0), (-372 - 12, 520));
+        // Taller than the work area: pinned to its top, not off screen.
+        assert_eq!(flyout_origin((0, 0, 1920, 600), (372, 900), 1.0), (1536, 0));
+    }
+
+    #[test]
+    fn tray_click_right_after_hiding_is_the_same_click() {
+        let hidden = Instant::now();
+        assert!(is_same_click(hidden, hidden + Duration::from_millis(120)));
+        assert!(!is_same_click(hidden, hidden + Duration::from_millis(400)));
+        // A click stamped before the hide (clock order) counts as the same click; no panic.
+        assert!(is_same_click(hidden + Duration::from_millis(5), hidden));
+    }
+
+    #[test]
+    fn tooltips() {
+        let mut c = Controller::new(Box::new(FakeHeadset::default()), Log::memory());
+        assert_eq!(tooltip(c.state()), "QC Buddy · not connected");
+        c.start();
+        assert_eq!(tooltip(c.state()), "QC Buddy · Bose QC45 · 80%");
+        let off = Controller::new(Box::new(FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() })), Log::memory());
+        assert_eq!(tooltip(off.state()), "QC Buddy · not connected");
+    }
+
+    #[test]
+    fn tray_icon_colors() {
+        let color = |battery: Option<u8>, light: bool| {
+            let icon = tray_icon(battery, light);
+            let rgba = icon.rgba();
+            let p = rgba.chunks(4).find(|p| p[3] > 200).expect("visible pixels");
+            [p[0], p[1], p[2]]
+        };
+        assert_eq!(color(Some(80), false), [0xFF, 0xFF, 0xFF], "white digits on a dark taskbar");
+        assert_eq!(color(Some(80), true), [0x1B, 0x1B, 0x1B], "dark digits on a light taskbar");
+        assert_eq!(color(Some(20), false), [0xE8, 0x11, 0x23], "red at 20% or less");
+        assert_eq!(color(Some(20), true), [0xE8, 0x11, 0x23]);
+        // Headphones glyph when the battery is unknown, in the taskbar's contrast color.
+        assert!(color(None, false).iter().all(|c| *c > 200));
+        assert!(color(None, true).iter().all(|c| *c < 60));
+    }
 
     fn lit(rgba: &[u8]) -> usize {
         rgba.chunks(4).filter(|p| p[3] != 0).count()

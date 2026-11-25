@@ -4,7 +4,8 @@ import { displayName, holdsAudio, peerKind, type AppState, type Peer } from "./t
 /** The headset's paired devices: connect, disconnect, switch (M3). */
 export function DevicesCard({ state }: { state: AppState }) {
   const holding = state.peers.filter((p) => holdsAudio(p, state)).length;
-  const slots = state.multipoint ? 2 : 1;
+  // Multipoint off allows one device; right after turning it off both may still be on.
+  const slots = Math.max(state.multipoint ? 2 : 1, holding);
   const full = holding >= slots;
   const working = state.peerAction !== null || state.busy !== null;
 

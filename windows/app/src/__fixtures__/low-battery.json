@@ -1,0 +1,139 @@
+{
+  "link": {
+    "kind": "connected"
+  },
+  "headphones": [
+    {
+      "address": "78:2B:64:00:00:45",
+      "name": "Bose QC45",
+      "connected": true
+    }
+  ],
+  "deviceName": "Bose QC45",
+  "productName": "Bose QC45",
+  "firmware": "4.0.4-4360+de6a887",
+  "battery": 15,
+  "charging": false,
+  "modes": [
+    {
+      "index": 0,
+      "name": "Quiet",
+      "rawCnc": 0,
+      "windBlock": false,
+      "editable": false,
+      "prompt": [
+        0,
+        1
+      ],
+      "storedName": "Quiet",
+      "autoCnc": false,
+      "spatial": 0
+    },
+    {
+      "index": 1,
+      "name": "Aware",
+      "rawCnc": 10,
+      "windBlock": false,
+      "editable": false,
+      "prompt": [
+        0,
+        2
+      ],
+      "storedName": "Aware",
+      "autoCnc": false,
+      "spatial": 0
+    },
+    {
+      "index": 2,
+      "name": "Walk",
+      "rawCnc": 0,
+      "windBlock": true,
+      "editable": true,
+      "prompt": [
+        0,
+        21
+      ],
+      "storedName": "",
+      "autoCnc": false,
+      "spatial": 0
+    }
+  ],
+  "modeIndex": 2,
+  "freeModeSlot": 3,
+  "eqBands": [
+    {
+      "bandId": 0,
+      "name": "Bass",
+      "minimum": -10,
+      "maximum": 10,
+      "value": 0
+    },
+    {
+      "bandId": 1,
+      "name": "Mid",
+      "minimum": -10,
+      "maximum": 10,
+      "value": 0
+    },
+    {
+      "bandId": 2,
+      "name": "Treble",
+      "minimum": -10,
+      "maximum": 10,
+      "value": 0
+    }
+  ],
+  "multipoint": true,
+  "sidetone": 0,
+  "peers": [
+    {
+      "mac": "10:00:00:00:00:02",
+      "name": "DESKTOP-QCTEST",
+      "connected": true,
+      "isLocal": true,
+      "isBoseProduct": false,
+      "active": false
+    },
+    {
+      "mac": "10:00:00:00:00:01",
+      "name": "Sam's MacBook Pro",
+      "connected": true,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": true
+    },
+    {
+      "mac": "10:00:00:00:00:04",
+      "name": "Sam's MacBook Air",
+      "connected": false,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": false
+    },
+    {
+      "mac": "10:00:00:00:00:03",
+      "name": "Sam’s iPhone",
+      "connected": false,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": false
+    }
+  ],
+  "activePeer": "10:00:00:00:00:01",
+  "source": "bluetooth",
+  "pairingMode": false,
+  "pcAudio": true,
+  "supportsModes": true,
+  "supportsEq": true,
+  "supportsMultipoint": true,
+  "supportsSidetone": true,
+  "supportsPeers": true,
+  "peersLoaded": true,
+  "channel": 8,
+  "busy": null,
+  "peerAction": null,
+  "actionNote": null,
+  "pendingSwitch": null,
+  "error": null,
+  "askBeforeSwitch": false
+}

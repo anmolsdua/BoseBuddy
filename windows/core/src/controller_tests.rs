@@ -346,3 +346,204 @@ fn background_tick_attaches_once_windows_connects_the_headset() {
     assert_eq!(c.state().link, LinkState::Connected);
     assert_eq!(c.state().battery, Some(80));
 }
+
+// MARK: - Edge cases
+
+#[test]
+fn failure_key_ignores_durations() {
+    use crate::controller::failure_key;
+    let a = "No reply from the headphones when reading battery level after 2.8s [2.2 get]";
+    let b = "No reply from the headphones when reading battery level after 10.45s [2.2 get]";
+    assert_eq!(failure_key(a), failure_key(b));
+    assert_eq!(failure_key(a), "No reply from the headphones when reading battery level [2.2 get]");
+    // Lines without a duration, or with "after" in other text, are kept whole.
+    let c = "Headphones don't support reading charging state [2.3 get, error 4 unsupported function]";
+    assert_eq!(failure_key(c), c);
+    assert_eq!(failure_key("Failed after all: x"), "Failed after all: x");
+}
+
+#[test]
+fn timeouts_are_logged_once() {
+    let (mut c, headset, log) = connected(FakeState::default());
+    headset.state().silent.push((31, 3));
+    c.poll();
+    c.poll();
+    let lines: Vec<String> = log.lines().into_iter().filter(|l| l.contains("current mode")).collect();
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].starts_with("No reply from the headphones when reading current mode after "));
+    assert_eq!(c.state().link, LinkState::Connected, "a timeout isn't a lost link");
+}
+
+#[test]
+fn disconnect_this_pc_audio() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    assert!(c.state().pc_audio);
+    c.disconnect_peer(&peer_mac(2));
+    assert!(!c.state().pc_audio);
+    assert!(!headset.state().peer(&peer_mac(2)).unwrap().connected);
+    assert_eq!((c.state().busy.clone(), c.state().error.clone()), (None, None));
+}
+
+#[test]
+fn ask_which_can_drop_this_pc() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    c.set_ask_before_switch(true);
+    c.connect_peer(&peer_mac(3), false);
+    c.confirm_pending_switch(&peer_mac(2));
+    let fake = headset.state();
+    assert!(!fake.peer(&peer_mac(2)).unwrap().connected, "PC audio dropped as chosen");
+    assert!(fake.peer(&peer_mac(1)).unwrap().connected, "MacBook kept");
+    assert!(fake.peer(&peer_mac(3)).unwrap().connected, "phone connected");
+    drop(fake);
+    assert!(!c.state().pc_audio);
+    assert_eq!(c.state().peer_action, None);
+}
+
+#[test]
+fn turning_off_ask_which_clears_a_pending_prompt() {
+    let (mut c, _, _) = connected(FakeState::default());
+    c.set_ask_before_switch(true);
+    c.connect_peer(&peer_mac(3), false);
+    assert!(c.state().pending_switch.is_some());
+    c.set_ask_before_switch(false);
+    assert_eq!(c.state().pending_switch, None);
+    // A stale confirmation does nothing.
+    c.confirm_pending_switch(&peer_mac(1));
+    assert!(c.state().peer(&peer_mac(1)).unwrap().connected);
+}
+
+#[test]
+fn disconnect_that_does_not_take_is_reported() {
+    let (mut c, headset, _) = connected(FakeState { ignore_disconnect: true, ..FakeState::default() });
+    c.disconnect_peer(&peer_mac(1));
+    assert_eq!(c.state().error.as_deref(), Some("Couldn't disconnect Sam's MacBook Pro. Try again."));
+    let checks = headset.state().request_log().iter().filter(|l| *l == "4.5 get").count();
+    assert!(checks >= 12, "waited for it: {checks} checks");
+}
+
+#[test]
+fn connect_error_messages() {
+    for (code, expected) in [
+        (7, "Sam's MacBook Air isn't available. Make sure it's nearby and Bluetooth is on."),
+        (11, "Sam's MacBook Air is no longer paired with the headphones."),
+        (12, "The headphones are busy. Try again in a moment."),
+        (3, "Couldn't connect Sam's MacBook Air (unsupported block)."),
+    ] {
+        let mut fake = FakeState::default();
+        fake.peers[0].connected = false;
+        fake.connect_error = Some(code);
+        let (mut c, _, _) = connected(fake);
+        c.connect_peer(&peer_mac(4), false);
+        assert_eq!(c.state().error.as_deref(), Some(expected), "code {code}");
+        assert_eq!(c.state().peer_action, None);
+    }
+}
+
+#[test]
+fn actions_need_a_connection() {
+    let headset = FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+    c.start();
+    c.set_mode(1);
+    c.set_eq(0, 4);
+    c.apply_eq(&[1, 2, 3]);
+    c.set_sidetone(2);
+    c.set_multipoint(false);
+    c.connect_peer(&peer_mac(3), false);
+    c.disconnect_peer(&peer_mac(1));
+    c.create_custom_mode();
+    c.enter_pairing_mode();
+    c.power_off();
+    c.connect_pc_audio(false);
+    assert!(headset.state().requests.is_empty());
+    assert_eq!(c.state().error.as_deref(), Some("Connect the headphones first."));
+}
+
+#[test]
+fn connect_without_a_connected_headset_explains_what_to_do() {
+    let headset = FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset), Log::memory());
+    c.connect(None);
+    assert!(matches!(c.state().link, LinkState::Failed(_)));
+    assert!(c.state().error.as_deref().unwrap().starts_with("Connect the headphones from the side button"));
+}
+
+#[test]
+fn no_free_slot_means_no_custom_mode() {
+    let mut fake = FakeState::default();
+    fake.records.pop(); // no empty slot 3
+    let (mut c, headset, _) = connected(fake);
+    assert_eq!(c.state().free_mode_slot, None);
+    c.create_custom_mode();
+    assert!(headset.state().requests.is_empty());
+}
+
+#[test]
+fn headset_without_modes_gets_quiet_and_aware() {
+    let (c, _, _) = connected(FakeState { records: vec![], ..FakeState::default() });
+    let names: Vec<&str> = c.state().modes.iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["Quiet", "Aware"]);
+}
+
+#[test]
+fn eq_edges() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    c.set_eq(9, 4); // no such band
+    assert!(headset.state().requests.is_empty());
+    c.apply_eq(&[-10, 10, -15]); // clamped; negative values survive the byte round trip
+    assert_eq!(c.state().eq_values(), [-10, 10, -10]);
+    assert_eq!(headset.state().eq.iter().map(|b| b.2).collect::<Vec<_>>(), [-10, 10, -10]);
+    headset.state().requests.clear();
+    c.apply_eq(&[-10, 10, -10]); // already there: nothing written
+    assert!(!headset.state().request_log().contains(&"1.7 setGet".to_string()));
+}
+
+#[test]
+fn progress_is_reported_during_a_switch() {
+    use std::sync::{Arc, Mutex};
+    let (mut c, _, _) = connected(FakeState::default());
+    let notes: Arc<Mutex<Vec<String>>> = Arc::default();
+    let sink = notes.clone();
+    c.set_on_change(move |s| {
+        if let Some(note) = &s.action_note {
+            sink.lock().unwrap().push(note.clone());
+        }
+    });
+    c.connect_peer(&peer_mac(3), false);
+    let notes = notes.lock().unwrap();
+    assert!(notes.contains(&"Switching from Sam's MacBook Pro…".to_string()), "{notes:?}");
+    assert!(notes.contains(&"Connecting Sam\u{2019}s iPhone…".to_string()), "{notes:?}");
+    assert_eq!(c.state().action_note, None, "cleared when done");
+}
+
+#[test]
+fn link_lost_in_the_middle_of_an_action() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().control_open = false;
+    c.connect_peer(&peer_mac(3), false);
+    assert_eq!(c.state().link, LinkState::Disconnected);
+    assert_eq!(c.state().peer_action, None, "no stuck spinner");
+    assert_eq!(c.state().action_note, None);
+}
+
+#[test]
+fn worker_polls_while_open_and_ticks_while_closed() {
+    use crate::worker::Timing;
+    use std::time::Duration;
+    let headset = FakeHeadset::new(FakeState::default());
+    let timing = Timing { poll: Duration::from_millis(20), tick: Duration::from_millis(20), battery_every: 2 };
+    let worker = Worker::spawn_with(Controller::new(Box::new(headset.clone()), Log::memory()), timing, |_| {});
+    worker.send(Command::Start);
+    worker.send(Command::FlyoutOpened);
+    std::thread::sleep(Duration::from_millis(150));
+    let open_polls = headset.state().request_log().iter().filter(|l| *l == "31.3 get").count();
+    assert!(open_polls >= 3, "polls mode while open: {open_polls}");
+
+    worker.send(Command::FlyoutClosed);
+    std::thread::sleep(Duration::from_millis(30));
+    headset.state().requests.clear();
+    std::thread::sleep(Duration::from_millis(150));
+    let log = headset.state().request_log();
+    assert!(!log.contains(&"31.3 get".to_string()), "no mode polling while closed: {log:?}");
+    assert!(log.contains(&"2.2 get".to_string()), "battery on battery ticks: {log:?}");
+}

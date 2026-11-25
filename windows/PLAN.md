@@ -191,8 +191,11 @@ Findings:
 
 - Unit tests in Rust against packets captured from the QC45 (the same records
   `Tests/NoiseModeTests.swift` uses).
-- A hardware checklist per release: connect, each card's controls, switching
-  devices, reconnect after sleep, log contents.
+- UI tests (Vitest) render real core states: `core/src/ui_fixtures.rs`
+  writes them as JSON, and the test fails if they're stale, which keeps the
+  Rust state and `types.ts` in step.
+- A hardware checklist per release:
+  [`HARDWARE-CHECKLIST.md`](HARDWARE-CHECKLIST.md).
 - Only one headset (QC45, fw 4.0.4) is available; other models are best-effort
   and labelled as such.
 

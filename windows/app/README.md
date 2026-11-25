@@ -32,6 +32,17 @@ the app again opens the running one's flyout.
 
 The log is the same as the CLI's: `%LOCALAPPDATA%\QC Buddy\QCBuddy.log`.
 
+## Tests
+
+```powershell
+npm test                     # flyout (Vitest + Testing Library), renders core fixtures
+cd src-tauri; cargo test     # placement, tray click, tooltip, tray icon
+```
+
+The fixtures in `src/__fixtures__` are written by the core
+(`core/src/ui_fixtures.rs`), so a change to the core's state shape fails a
+test instead of breaking the flyout silently.
+
 ## How it fits together
 
 - `src-tauri/src/main.rs`: tray, flyout placement (bottom-right of the work

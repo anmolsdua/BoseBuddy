@@ -37,7 +37,7 @@ export function App() {
   );
 }
 
-function Flyout({ state }: { state: AppState }) {
+export function Flyout({ state }: { state: AppState }) {
   const connected = state.link.kind === "connected";
   return (
     <>
@@ -94,7 +94,7 @@ function Flyout({ state }: { state: AppState }) {
   );
 }
 
-function Header({ state }: { state: AppState }) {
+export function Header({ state }: { state: AppState }) {
   const { link } = state;
   let status: string;
   let dot: "on" | "busy" | "off";
@@ -133,7 +133,7 @@ function Header({ state }: { state: AppState }) {
   );
 }
 
-function NoiseCard({ state }: { state: AppState }) {
+export function NoiseCard({ state }: { state: AppState }) {
   const current = state.modes.find((m) => m.index === state.modeIndex);
   const switching = state.busy === "mode";
   const columns = Math.min(4, Math.max(1, state.modes.length));
@@ -162,7 +162,7 @@ function NoiseCard({ state }: { state: AppState }) {
   );
 }
 
-function ConnectCard({ state }: { state: AppState }) {
+export function ConnectCard({ state }: { state: AppState }) {
   const connecting = state.link.kind === "connecting";
   const none = state.headphones.length === 0;
   return (

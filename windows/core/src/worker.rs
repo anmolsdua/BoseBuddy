@@ -20,6 +20,20 @@ pub const BACKGROUND_TICK: Duration = Duration::from_secs(60);
 /// ... and read the battery every 5 minutes for the tray icon.
 pub const BATTERY_EVERY_TICKS: u32 = 5;
 
+/// How often the worker polls; tests shorten it.
+#[derive(Clone, Copy, Debug)]
+pub struct Timing {
+    pub poll: Duration,
+    pub tick: Duration,
+    pub battery_every: u32,
+}
+
+impl Default for Timing {
+    fn default() -> Timing {
+        Timing { poll: POLL_INTERVAL, tick: BACKGROUND_TICK, battery_every: BATTERY_EVERY_TICKS }
+    }
+}
+
 /// Sent by the UI as JSON, e.g. `{"type": "setMode", "args": 2}` or
 /// `{"type": "updateMode", "args": {"index": 2, "rawCnc": 4, "windBlock": false}}`.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -57,7 +71,15 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn spawn(mut controller: Controller, on_state: impl Fn(&State) + Send + Sync + Clone + 'static) -> Worker {
+    pub fn spawn(controller: Controller, on_state: impl Fn(&State) + Send + Sync + Clone + 'static) -> Worker {
+        Worker::spawn_with(controller, Timing::default(), on_state)
+    }
+
+    pub fn spawn_with(
+        mut controller: Controller,
+        timing: Timing,
+        on_state: impl Fn(&State) + Send + Sync + Clone + 'static,
+    ) -> Worker {
         let (tx, rx) = mpsc::channel::<Command>();
         let progress = on_state.clone();
         controller.set_on_change(move |state| progress(state));
@@ -65,8 +87,8 @@ impl Worker {
             .name("qcbuddy-controller".into())
             .spawn(move || {
                 let mut flyout_open = false;
-                let mut next_poll = Instant::now() + POLL_INTERVAL;
-                let mut next_tick = Instant::now() + BACKGROUND_TICK;
+                let mut next_poll = Instant::now() + timing.poll;
+                let mut next_tick = Instant::now() + timing.tick;
                 let mut ticks: u32 = 0;
                 loop {
                     let deadline = if flyout_open { next_poll } else { next_tick };
@@ -78,23 +100,23 @@ impl Worker {
                     match command {
                         None if flyout_open => {
                             controller.poll();
-                            next_poll = Instant::now() + POLL_INTERVAL;
+                            next_poll = Instant::now() + timing.poll;
                         }
                         None => {
                             ticks += 1;
-                            controller.background_tick(ticks.is_multiple_of(BATTERY_EVERY_TICKS));
-                            next_tick = Instant::now() + BACKGROUND_TICK;
+                            controller.background_tick(ticks.is_multiple_of(timing.battery_every));
+                            next_tick = Instant::now() + timing.tick;
                         }
                         Some(Command::Shutdown) => return,
                         Some(command) => {
                             match &command {
                                 Command::FlyoutOpened => {
                                     flyout_open = true;
-                                    next_poll = Instant::now() + POLL_INTERVAL;
+                                    next_poll = Instant::now() + timing.poll;
                                 }
                                 Command::FlyoutClosed => {
                                     flyout_open = false;
-                                    next_tick = Instant::now() + BACKGROUND_TICK;
+                                    next_tick = Instant::now() + timing.tick;
                                 }
                                 _ => {}
                             }

@@ -1,0 +1,41 @@
+{
+  "link": {
+    "kind": "disconnected"
+  },
+  "headphones": [
+    {
+      "address": "78:2B:64:00:00:45",
+      "name": "Bose QC45",
+      "connected": false
+    }
+  ],
+  "deviceName": "Bose headphones",
+  "productName": "",
+  "firmware": "",
+  "battery": null,
+  "charging": false,
+  "modes": [],
+  "modeIndex": null,
+  "freeModeSlot": null,
+  "eqBands": [],
+  "multipoint": false,
+  "sidetone": 0,
+  "peers": [],
+  "activePeer": null,
+  "source": "none",
+  "pairingMode": false,
+  "pcAudio": false,
+  "supportsModes": false,
+  "supportsEq": false,
+  "supportsMultipoint": false,
+  "supportsSidetone": false,
+  "supportsPeers": false,
+  "peersLoaded": false,
+  "channel": 0,
+  "busy": null,
+  "peerAction": null,
+  "actionNote": null,
+  "pendingSwitch": null,
+  "error": null,
+  "askBeforeSwitch": false
+}

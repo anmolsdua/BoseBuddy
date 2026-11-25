@@ -492,3 +492,81 @@ fn summary(s: &State) -> String {
         devices.join(", ")
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qcbuddy_core::fake::{peer_mac, FakeHeadset};
+
+    fn state() -> State {
+        let mut c = Controller::new(Box::new(FakeHeadset::default()), Log::memory());
+        c.start();
+        c.state().clone()
+    }
+
+    #[test]
+    fn devices_by_mac_or_unique_name_part() {
+        let s = state();
+        assert_eq!(find_peer(&s, "iphone").unwrap().mac, peer_mac(3));
+        assert_eq!(find_peer(&s, "10-00-00-00-00-04").unwrap().mac, peer_mac(4));
+        assert_eq!(find_peer(&s, " MacBook Pro ").unwrap().mac, peer_mac(1));
+        let ambiguous = find_peer(&s, "macbook").unwrap_err();
+        assert!(ambiguous.contains("matches") && ambiguous.contains("be more specific"), "{ambiguous}");
+        assert!(find_peer(&s, "pixel").unwrap_err().starts_with("no device matching"));
+        assert!(find_peer(&s, "  ").is_err());
+    }
+
+    #[test]
+    fn modes_by_index_or_name() {
+        let s = state();
+        assert_eq!(find_mode(&s, "walk"), Ok(2));
+        assert_eq!(find_mode(&s, "1"), Ok(1));
+        let missing = find_mode(&s, "9").unwrap_err();
+        assert_eq!(missing, "no mode \"9\" (have: Quiet, Aware, Walk)");
+    }
+
+    #[test]
+    fn presets_by_name() {
+        let store = EqPresetStore::in_memory();
+        assert_eq!(find_preset(&store, " WARM ").unwrap().values, [4, 0, -3]);
+        assert!(find_preset(&store, "beebeebop").is_err());
+    }
+
+    #[test]
+    fn flag_values() {
+        let args: Vec<String> = ["walk", "--anc", "7"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(flag_value::<u8>(&args, "--anc"), Some(7));
+        assert_eq!(flag_value::<u8>(&args, "--wind"), None);
+        let bad: Vec<String> = ["--anc", "x"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(flag_value::<u8>(&bad, "--anc"), None);
+    }
+
+    #[test]
+    fn commands_against_the_simulated_headset() {
+        let headset = FakeHeadset::default();
+        let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+        c.start();
+        let mut presets = EqPresetStore::in_memory();
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+        run(&mut c, &mut presets, "mode", &args(&["walk"])).unwrap();
+        assert_eq!(headset.state().mode_index, 2);
+        run(&mut c, &mut presets, "mode-edit", &args(&["walk", "--anc", "7"])).unwrap();
+        assert_eq!(headset.state().records[2][42], 3, "ANC 7 is raw CNC 3");
+        assert!(run(&mut c, &mut presets, "mode-edit", &args(&["quiet", "--anc", "5"])).unwrap_err().contains("can't be edited"));
+        assert!(run(&mut c, &mut presets, "mode-edit", &args(&["walk", "--anc", "11"])).is_err());
+        run(&mut c, &mut presets, "eq", &args(&["4", "0", "-3"])).unwrap();
+        assert_eq!(c.state().eq_values(), [4, 0, -3]);
+        assert!(run(&mut c, &mut presets, "eq", &args(&["4", "0"])).unwrap_err().contains("give 3 values"));
+        run(&mut c, &mut presets, "preset-save", &args(&["Late", "night"])).unwrap();
+        assert_eq!(presets.custom[0].name, "Late night");
+        assert!(run(&mut c, &mut presets, "preset-delete", &args(&["Flat"])).unwrap_err().contains("built in"));
+        run(&mut c, &mut presets, "sidetone", &args(&["2"])).unwrap();
+        run(&mut c, &mut presets, "multipoint", &args(&["off"])).unwrap();
+        assert!(!headset.state().multipoint);
+        assert!(run(&mut c, &mut presets, "multipoint", &args(&["maybe"])).is_err());
+        run(&mut c, &mut presets, "connect", &args(&["iphone"])).unwrap();
+        assert!(headset.state().peer(&peer_mac(3)).unwrap().connected);
+        assert!(run(&mut c, &mut presets, "frobnicate", &[]).unwrap_err().starts_with("unknown command"));
+    }
+}

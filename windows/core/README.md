@@ -65,4 +65,13 @@ cargo clippy --all-targets
 
 Unit tests use replies captured from the QC45 (fw 4.0.4) with device names
 and addresses replaced, plus the cases from `Tests/*.swift`. Controller tests
-run against the simulated headset.
+run against the simulated headset, including failures (timeouts, lost link,
+rejected connects) and the worker's polling.
+
+`ui_fixtures.rs` writes real controller states as JSON for the flyout's tests
+(`../app/src/__fixtures__`). It fails when they're out of date; regenerate with
+`$env:UPDATE_FIXTURES=1; cargo test ui_fixtures`, then run `npm test` in
+`../app`.
+
+What only hardware can check is in
+[`../HARDWARE-CHECKLIST.md`](../HARDWARE-CHECKLIST.md).

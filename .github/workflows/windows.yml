@@ -29,7 +29,8 @@ jobs:
         run: cargo run --quiet --bin qcbuddy -- --fake status
 
   app:
-    # Type-checks the flyout UI and builds the Tauri app (no installer).
+    # UI tests (render from core/src/ui_fixtures.rs fixtures), type check,
+    # and the Tauri app's build and tests (no installer).
     runs-on: windows-latest
     defaults:
       run:
@@ -48,6 +49,9 @@ jobs:
         with:
           workspaces: windows/app/src-tauri
       - run: npm ci
+      - run: npm test
       - run: npm run build
+      - run: cargo test
+        working-directory: windows/app/src-tauri
       - run: cargo clippy -- -D warnings
         working-directory: windows/app/src-tauri

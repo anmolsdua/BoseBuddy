@@ -1138,15 +1138,23 @@ impl Controller {
     }
 
     fn log_failure(&mut self, line: String) {
-        // Durations vary, so leave them out of the "already logged" key.
-        let key = match (line.find(" after "), line.find("s [")) {
-            (Some(a), Some(b)) if b > a => format!("{}{}", &line[..a], &line[b + 1..]),
-            _ => line.clone(),
-        };
-        if self.logged_failures.insert(key) {
+        if self.logged_failures.insert(failure_key(&line)) {
             self.log.write(line);
         }
     }
+}
+
+/// A failure line without its duration (" after 2.8s"), so the same failure
+/// with a different timing counts as already logged.
+pub(crate) fn failure_key(line: &str) -> String {
+    if let Some(start) = line.find(" after ") {
+        let rest = &line[start + " after ".len()..];
+        let digits = rest.find(|c: char| !(c.is_ascii_digit() || c == '.')).unwrap_or(rest.len());
+        if digits > 0 && rest[digits..].starts_with('s') {
+            return format!("{}{}", &line[..start], &rest[digits + 1..]);
+        }
+    }
+    line.to_string()
 }
 
 fn ensure_ok(packets: &[Packet], fblock: u8, function: u8) -> Result<(), BmapError> {
