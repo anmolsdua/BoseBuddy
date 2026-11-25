@@ -321,3 +321,28 @@ fn flyout_open_rereads_settings_changed_elsewhere() {
     assert_eq!(c.state().sidetone, 2);
     assert!(!c.state().multipoint);
 }
+
+#[test]
+fn background_tick_reads_battery_only_on_battery_ticks() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().battery = 55;
+    c.background_tick(false);
+    assert!(headset.state().requests.is_empty(), "no Bluetooth traffic on a plain tick");
+    assert_eq!(c.state().battery, Some(80));
+    c.background_tick(true);
+    assert_eq!(c.state().battery, Some(55));
+    assert_eq!(headset.state().request_log(), ["2.2 get", "2.3 get"]);
+}
+
+#[test]
+fn background_tick_attaches_once_windows_connects_the_headset() {
+    let headset = FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() });
+    let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+    c.start();
+    c.background_tick(false);
+    assert_eq!(c.state().link, LinkState::Disconnected, "headset still off");
+    headset.state().powered_off = false;
+    c.background_tick(false);
+    assert_eq!(c.state().link, LinkState::Connected);
+    assert_eq!(c.state().battery, Some(80));
+}

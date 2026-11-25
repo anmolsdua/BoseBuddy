@@ -82,9 +82,12 @@ captured test fixtures. The macOS app is unchanged.
   requests read each other's replies.
 - **GetAll (31.1) is single-flight** and accepted only when its 31.1 RESULT
   arrives; retry up to 3x, keep the last good list.
-- **No new polling.** Battery/source/mode every 15 s only while the flyout is
-  open; modes re-read on open; audio endpoint changes come from Core Audio
-  events, not a timer.
+- **Polling.** Battery/source/mode every 15 s only while the flyout is open;
+  modes, EQ, sidetone and multipoint re-read on open. While it's closed, one
+  light tick a minute: attach when Windows connects the headset (checks the
+  PC's paired devices, no Bluetooth traffic), and read the battery every 5
+  minutes for the tray icon (added in M2; the tray shows the battery as
+  digits). Audio endpoint changes should come from Core Audio events (M5).
 - **IPC**: Tauri commands for actions (`set_mode`, `update_mode`,
   `create_custom_mode`, `apply_eq`, `connect_peer`, ...); one `state` event the
   UI renders from.

@@ -30,6 +30,10 @@ struct AppState {
     /// When the flyout last hid on losing focus. A tray click that arrives
     /// right after is the same click, so it shouldn't reopen the flyout.
     hidden_at: Mutex<Option<Instant>>,
+    /// The taskbar is light, so tray icons are drawn dark.
+    light_taskbar: bool,
+    /// Battery shown on the tray icon (None = headphones glyph), to redraw only on change.
+    tray_battery: Mutex<Option<Option<u8>>>,
 }
 
 #[tauri::command]
@@ -70,7 +74,13 @@ fn main() {
             let controller = Controller::new(platform(), Log::file(default_path()));
             let emitter = handle.clone();
             let worker = Worker::spawn(controller, move |state: &State| publish(&emitter, state));
-            app.manage(AppState { worker, latest: Mutex::new(None), hidden_at: Mutex::new(None) });
+            app.manage(AppState {
+                worker,
+                latest: Mutex::new(None),
+                hidden_at: Mutex::new(None),
+                light_taskbar: light_taskbar(),
+                tray_battery: Mutex::new(None),
+            });
 
             build_tray(&handle)?;
             if let Some(window) = handle.get_webview_window(FLYOUT) {
@@ -107,15 +117,79 @@ fn platform() -> Box<dyn Platform> {
 
 /// Called on the worker thread with every state change.
 fn publish(app: &AppHandle, state: &State) {
-    if let Some(shared) = app.try_state::<AppState>() {
-        if let Ok(mut latest) = shared.latest.lock() {
-            *latest = Some(state.clone());
+    let _ = app.emit("state", state);
+    let Some(shared) = app.try_state::<AppState>() else { return };
+    if let Ok(mut latest) = shared.latest.lock() {
+        *latest = Some(state.clone());
+    }
+    let Some(tray) = app.tray_by_id(TRAY) else { return };
+    let _ = tray.set_tooltip(Some(tooltip(state)));
+    let battery = if state.link.is_connected() { state.battery } else { None };
+    if let Ok(mut shown) = shared.tray_battery.lock() {
+        if *shown != Some(battery) {
+            *shown = Some(battery);
+            let _ = tray.set_icon(Some(tray_icon(battery, shared.light_taskbar)));
+        }
+    };
+}
+
+/// The battery level as digits, or the headphones glyph when unknown.
+fn tray_icon(battery: Option<u8>, light_taskbar: bool) -> Image<'static> {
+    match battery {
+        Some(level) => {
+            let color = if level <= 20 {
+                [0xE8, 0x11, 0x23, 0xFF]
+            } else if light_taskbar {
+                [0x1B, 0x1B, 0x1B, 0xFF]
+            } else {
+                [0xFF, 0xFF, 0xFF, 0xFF]
+            };
+            Image::new_owned(battery_digits(level, color), ICON_SIZE as u32, ICON_SIZE as u32)
+        }
+        None if light_taskbar => Image::from_bytes(include_bytes!("../icons/tray-dark.png")).expect("tray icon"),
+        None => Image::from_bytes(include_bytes!("../icons/tray-light.png")).expect("tray icon"),
+    }
+}
+
+const ICON_SIZE: usize = 32;
+
+/// 32×32 RGBA with `level` drawn in a 3×5 pixel font, scaled to fill the
+/// icon (×5 for two digits, ×3 for "100"), so it stays sharp at 16 px.
+fn battery_digits(level: u8, color: [u8; 4]) -> Vec<u8> {
+    const FONT: [[u8; 5]; 10] = [
+        [0b111, 0b101, 0b101, 0b101, 0b111],
+        [0b010, 0b110, 0b010, 0b010, 0b111],
+        [0b111, 0b001, 0b111, 0b100, 0b111],
+        [0b111, 0b001, 0b111, 0b001, 0b111],
+        [0b101, 0b101, 0b111, 0b001, 0b001],
+        [0b111, 0b100, 0b111, 0b001, 0b111],
+        [0b111, 0b100, 0b111, 0b101, 0b111],
+        [0b111, 0b001, 0b001, 0b001, 0b001],
+        [0b111, 0b101, 0b111, 0b101, 0b111],
+        [0b111, 0b101, 0b111, 0b001, 0b111],
+    ];
+    let digits: Vec<usize> = level.min(100).to_string().bytes().map(|b| (b - b'0') as usize).collect();
+    let (scale, gap) = if digits.len() == 3 { (3, 2) } else { (5, 2) };
+    let width = digits.len() * 3 * scale + (digits.len() - 1) * gap;
+    let (x0, y0) = ((ICON_SIZE - width) / 2, (ICON_SIZE - 5 * scale) / 2);
+    let mut rgba = vec![0u8; ICON_SIZE * ICON_SIZE * 4];
+    for (i, digit) in digits.iter().enumerate() {
+        let left = x0 + i * (3 * scale + gap);
+        for (row, bits) in FONT[*digit].iter().enumerate() {
+            for col in 0..3 {
+                if bits & (0b100 >> col) == 0 {
+                    continue;
+                }
+                for y in y0 + row * scale..y0 + (row + 1) * scale {
+                    for x in left + col * scale..left + (col + 1) * scale {
+                        let at = (y * ICON_SIZE + x) * 4;
+                        rgba[at..at + 4].copy_from_slice(&color);
+                    }
+                }
+            }
         }
     }
-    let _ = app.emit("state", state);
-    if let Some(tray) = app.tray_by_id(TRAY) {
-        let _ = tray.set_tooltip(Some(tooltip(state)));
-    }
+    rgba
 }
 
 fn tooltip(state: &State) -> String {
@@ -131,13 +205,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open QC Buddy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
-    let icon = if light_taskbar() {
-        Image::from_bytes(include_bytes!("../icons/tray-dark.png"))?
-    } else {
-        Image::from_bytes(include_bytes!("../icons/tray-light.png"))?
-    };
+    let light = app.state::<AppState>().light_taskbar;
     TrayIconBuilder::with_id(TRAY)
-        .icon(icon)
+        .icon(tray_icon(None, light))
         .tooltip("QC Buddy")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -236,4 +306,24 @@ fn light_taskbar() -> bool {
 #[cfg(not(windows))]
 fn light_taskbar() -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lit(rgba: &[u8]) -> usize {
+        rgba.chunks(4).filter(|p| p[3] != 0).count()
+    }
+
+    #[test]
+    fn battery_digits_fit_the_icon() {
+        for level in [0u8, 5, 42, 80, 99, 100, 255] {
+            let rgba = battery_digits(level, [255; 4]);
+            assert_eq!(rgba.len(), ICON_SIZE * ICON_SIZE * 4);
+            assert!(lit(&rgba) > 0, "{level} draws something");
+        }
+        // "88" lights every segment of both digits: 2 digits x 13 cells x 5x5 px.
+        assert_eq!(lit(&battery_digits(88, [255; 4])), 2 * 13 * 25);
+    }
 }

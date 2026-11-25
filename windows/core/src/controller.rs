@@ -251,6 +251,29 @@ impl Controller {
         self.refresh(false);
     }
 
+    /// While the flyout is closed (every minute): attach to the headset once
+    /// Windows has connected it, and with `read_battery` (every few minutes)
+    /// keep the tray battery fresh. Never starts a Bluetooth connection, and
+    /// retries a failed attach only on battery ticks.
+    pub fn background_tick(&mut self, read_battery: bool) {
+        match self.state.link {
+            LinkState::Connected => {
+                if read_battery {
+                    self.read_battery();
+                }
+            }
+            LinkState::Connecting => {}
+            LinkState::Failed(_) if !read_battery => {}
+            LinkState::Disconnected | LinkState::Failed(_) => {
+                self.state.headphones = self.platform.paired_headphones();
+                if let Some(connected) = self.state.headphones.iter().find(|h| h.connected).cloned() {
+                    self.state.link = LinkState::Disconnected;
+                    self.connect(Some(&connected.address));
+                }
+            }
+        }
+    }
+
     pub fn refresh_paired_devices(&mut self) {
         let found = self.platform.paired_headphones();
         if !self.state.link.is_connected() && !matches!(self.state.link, LinkState::Failed(_)) {

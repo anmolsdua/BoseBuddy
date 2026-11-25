@@ -1,7 +1,9 @@
 //! Runs the controller on its own thread. Commands arrive over a channel and
 //! run one at a time, so requests to the headset never overlap. Polls every
-//! 15 s only while the flyout is open; the state goes to `on_state` after
-//! every command and during long actions.
+//! 15 s while the flyout is open; while it's closed, only the light
+//! background tick (attach when Windows connects the headset, battery every
+//! 5 min for the tray). The state goes to `on_state` after every command and
+//! during long actions.
 
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
@@ -12,6 +14,11 @@ use serde::Deserialize;
 use crate::controller::{Controller, State};
 
 pub const POLL_INTERVAL: Duration = Duration::from_secs(15);
+/// While the flyout is closed: check for the headset once a minute
+/// (no Bluetooth traffic) ...
+pub const BACKGROUND_TICK: Duration = Duration::from_secs(60);
+/// ... and read the battery every 5 minutes for the tray icon.
+pub const BATTERY_EVERY_TICKS: u32 = 5;
 
 /// Sent by the UI as JSON, e.g. `{"type": "setMode", "args": 2}` or
 /// `{"type": "updateMode", "args": {"index": 2, "rawCnc": 4, "windBlock": false}}`.
@@ -59,23 +66,24 @@ impl Worker {
             .spawn(move || {
                 let mut flyout_open = false;
                 let mut next_poll = Instant::now() + POLL_INTERVAL;
+                let mut next_tick = Instant::now() + BACKGROUND_TICK;
+                let mut ticks: u32 = 0;
                 loop {
-                    let command = if flyout_open {
-                        match rx.recv_timeout(next_poll.saturating_duration_since(Instant::now())) {
-                            Ok(command) => Some(command),
-                            Err(RecvTimeoutError::Timeout) => None,
-                            Err(RecvTimeoutError::Disconnected) => return,
-                        }
-                    } else {
-                        match rx.recv() {
-                            Ok(command) => Some(command),
-                            Err(_) => return,
-                        }
+                    let deadline = if flyout_open { next_poll } else { next_tick };
+                    let command = match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+                        Ok(command) => Some(command),
+                        Err(RecvTimeoutError::Timeout) => None,
+                        Err(RecvTimeoutError::Disconnected) => return,
                     };
                     match command {
-                        None => {
+                        None if flyout_open => {
                             controller.poll();
                             next_poll = Instant::now() + POLL_INTERVAL;
+                        }
+                        None => {
+                            ticks += 1;
+                            controller.background_tick(ticks.is_multiple_of(BATTERY_EVERY_TICKS));
+                            next_tick = Instant::now() + BACKGROUND_TICK;
                         }
                         Some(Command::Shutdown) => return,
                         Some(command) => {
@@ -84,7 +92,10 @@ impl Worker {
                                     flyout_open = true;
                                     next_poll = Instant::now() + POLL_INTERVAL;
                                 }
-                                Command::FlyoutClosed => flyout_open = false,
+                                Command::FlyoutClosed => {
+                                    flyout_open = false;
+                                    next_tick = Instant::now() + BACKGROUND_TICK;
+                                }
                                 _ => {}
                             }
                             run(&mut controller, command);
