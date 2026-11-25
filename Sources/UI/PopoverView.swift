@@ -538,12 +538,23 @@ struct PopoverView: View {
                 ForEach(model.modes) { mode in
                     modeChip(mode)
                 }
+                if model.freeModeSlot != nil {
+                    createModeChip
+                }
             }
 
-            if model.busyAction == "mode" {
+            if let mode = model.modes.first(where: { $0.index == model.modeIndex }), mode.editable {
+                Divider().padding(.vertical, 2)
+                ModeEditor(mode: mode, disabled: model.busyAction != nil) { rawCNC, windBlock in
+                    Task { await model.updateMode(mode, rawCNC: rawCNC, windBlock: windBlock) }
+                }
+            }
+
+            if model.busyAction == "mode" || model.busyAction == "mode-edit" {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.mini)
-                    Text("Switching…").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(model.busyAction == "mode" ? "Switching…" : "Saving to headphones…")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
             }
         }
@@ -568,6 +579,27 @@ struct PopoverView: View {
         }
         .buttonStyle(.plain)
         .disabled(model.busyAction != nil)
+    }
+
+    /// Shown when an editable slot is free: creates a "Custom" mode there.
+    private var createModeChip: some View {
+        Button {
+            Task { await model.createCustomMode() }
+        } label: {
+            Label(BoseMode.customName, systemImage: "plus")
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                )
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(model.busyAction != nil)
+        .help("Create a Custom mode from the current noise cancelling level")
     }
 
     // MARK: - Equalizer
@@ -974,6 +1006,61 @@ private struct FlowLayout: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
+    }
+}
+
+/// Wind Block switch and noise cancelling slider for an editable mode. The
+/// slider is disabled while Wind Block is on, since the headphones then
+/// adjust noise cancelling themselves.
+private struct ModeEditor: View {
+    let mode: BoseMode
+    let disabled: Bool
+    let onCommit: (_ rawCNC: Int, _ windBlock: Bool) -> Void
+
+    @State private var draft: Double
+
+    init(mode: BoseMode, disabled: Bool, onCommit: @escaping (Int, Bool) -> Void) {
+        self.mode = mode
+        self.disabled = disabled
+        self.onCommit = onCommit
+        _draft = State(initialValue: Double(mode.ancLevel))
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Wind Block")
+                    .font(.system(size: 11))
+                Spacer()
+                MiniSwitch(isOn: mode.windBlock) {
+                    guard !disabled else { return }
+                    onCommit(10 - Int(draft), !mode.windBlock)
+                }
+            }
+            HStack(spacing: 8) {
+                Text("Noise cancelling")
+                    .font(.system(size: 11))
+                    .fixedSize()
+                Slider(
+                    value: $draft,
+                    in: 0...10,
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { onCommit(10 - Int(draft), false) }
+                    }
+                )
+                .controlSize(.mini)
+                Text(mode.windBlock ? "Auto" : "\(Int(draft))")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, alignment: .trailing)
+            }
+            .disabled(disabled || mode.windBlock)
+            .opacity(mode.windBlock ? 0.45 : 1)
+        }
+        .onChange(of: mode.ancLevel) { _, newValue in
+            draft = Double(newValue)
+        }
     }
 }
 
