@@ -14,6 +14,7 @@ pub mod platform;
 pub mod protocol;
 pub mod request_description;
 pub mod transport;
+pub mod update_feed;
 pub mod worker;
 
 pub use controller::{Controller, LinkState, State};
