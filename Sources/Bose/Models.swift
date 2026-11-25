@@ -43,13 +43,6 @@ struct BosePeer: Identifiable, Equatable {
     }
 }
 
-struct BoseMode: Identifiable, Equatable {
-    let index: Int
-    var name: String
-    var rawCNC: Int
-    var id: Int { index }
-}
-
 struct EQBand: Identifiable, Equatable {
     let bandID: Int
     var name: String

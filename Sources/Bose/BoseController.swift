@@ -583,38 +583,14 @@ final class BoseController: ObservableObject {
         guard linkState.isConnected else { return }
         do {
             let packets = try await exchange(31, 1, op: .start, drain: true, timeout: 2.8)
-            var found: [Int: BoseMode] = [:]
-            for packet in packets where packet.fblock == 31 && packet.function == 6 {
-                let bytes = [UInt8](packet.payload)
-                guard bytes.count >= 38 else { continue }
-                let index = Int(bytes[0])
-                guard index != 0xFF else { continue }
-                let name = ByteCodec.string(bytes[6..<38])
-                if name.isEmpty && index > 1 { continue }
-                let cncOffset = bytes.count >= 48 ? 38 : 42
-                let rawCNC = bytes.count > cncOffset ? Int(bytes[cncOffset]) : 0
-                found[index] = BoseMode(
-                    index: index,
-                    name: name.isEmpty ? Self.defaultModeName(index) : name,
-                    rawCNC: rawCNC
-                )
-            }
-            if found.isEmpty {
-                modes = [
-                    BoseMode(index: 0, name: "Quiet", rawCNC: 0),
-                    BoseMode(index: 1, name: "Aware", rawCNC: 10)
-                ]
-            } else {
-                modes = found.values.sorted { $0.index < $1.index }
-            }
+            let found = packets
+                .filter { $0.fblock == 31 && $0.function == 6 }
+                .compactMap { BoseMode(record: [UInt8]($0.payload)) }
+            let byIndex = Dictionary(found.map { ($0.index, $0) }, uniquingKeysWith: { $1 })
+            modes = byIndex.isEmpty ? BoseMode.fallback : byIndex.values.sorted { $0.index < $1.index }
             supportsModes = true
         } catch {
-            if modes.isEmpty {
-                modes = [
-                    BoseMode(index: 0, name: "Quiet", rawCNC: 0),
-                    BoseMode(index: 1, name: "Aware", rawCNC: 10)
-                ]
-            }
+            if modes.isEmpty { modes = BoseMode.fallback }
         }
     }
 
@@ -1011,16 +987,6 @@ final class BoseController: ObservableObject {
         return [8, 2, 9]
     }
 
-    private static func defaultModeName(_ index: Int) -> String {
-        switch index {
-        case 0: return "Quiet"
-        case 1: return "Aware"
-        case 2: return "Immersion"
-        case 3: return "Cinema"
-        default: return "Mode \(index + 1)"
-        }
-    }
-
     /// Debug helper: clears the non-local multipoint slots, then connects a target.
     func runSwitchTest(to fragment: String) async {
         guard linkState.isConnected else {
@@ -1095,10 +1061,7 @@ final class BoseController: ObservableObject {
         firmware = "1.0.6-80+f5f219b"
         linkState = .connected
         battery = 30
-        modes = [
-            BoseMode(index: 0, name: "Quiet", rawCNC: 0),
-            BoseMode(index: 1, name: "Aware", rawCNC: 10)
-        ]
+        modes = BoseMode.fallback
         modeIndex = 0
         multipoint = true
         eqBands = [
