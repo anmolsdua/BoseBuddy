@@ -2,10 +2,18 @@ name: Windows
 
 on:
   push:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
   workflow_dispatch:
+
+# Keep in step with windows-release.yml: cargo fingerprints include these, so
+# a mismatch would make the release build ignore the cache saved here.
+env:
+  # No debug symbols in CI builds: smaller, faster to link (no huge .pdb
+  # files), and smaller caches. Tests and panics still report file and line.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
   core:
@@ -16,15 +24,20 @@ jobs:
       run:
         working-directory: windows/core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/core
-      - run: cargo clippy --all-targets -- -D warnings
+          # rust-cache keys only on the toolchain and lockfiles, and doesn't
+          # save again on an exact hit. Without the workflows in the key, a
+          # cache saved by older steps (the first app run saved clippy-only
+          # metadata) is restored forever while every run rebuilds everything.
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
       - run: cargo test
+      - run: cargo clippy --all-targets -- -D warnings
       - name: CLI smoke test (simulated headset)
         run: cargo run --quiet --bin qcbuddy -- --fake status
 
@@ -36,8 +49,8 @@ jobs:
       run:
         working-directory: windows/app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -48,6 +61,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
       - run: npm ci
       - run: npm test
       - run: npm run build
@@ -55,3 +69,34 @@ jobs:
         working-directory: windows/app/src-tauri
       - run: cargo clippy -- -D warnings
         working-directory: windows/app/src-tauri
+
+  release-cache:
+    # On main only: build exactly what windows-release.yml builds (core tests,
+    # the Tauri release binary) and save it under the shared key that workflow
+    # restores. Tag builds can only read caches made on the default branch, so
+    # without this every release compiles ~400 crates from scratch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: qcbuddy-release
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+      - name: Core tests (built, not run)
+        working-directory: windows/core
+        run: cargo test --no-run
+      - name: Release build, same flags as the installer, without bundling
+        working-directory: windows/app
+        run: |
+          npm ci
+          npx tauri build --no-bundle

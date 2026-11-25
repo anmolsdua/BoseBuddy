@@ -11,12 +11,17 @@ on:
 permissions:
   contents: write
 
+# Same as windows.yml, so the release-cache job's build matches this one.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
 jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -24,9 +29,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          # Restores what windows.yml's release-cache job saved on main (tag
+          # builds can't read caches from other branches or tags).
+          shared-key: qcbuddy-release
           workspaces: |
             windows/core
             windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          save-if: false
 
       - name: Tag matches the app version
         id: version
