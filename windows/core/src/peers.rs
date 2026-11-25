@@ -9,9 +9,11 @@ pub fn parse_list(payload: &[u8]) -> Vec<String> {
     payload
         .get(1..)
         .unwrap_or_default()
-        .chunks_exact(6)
+        .as_chunks::<6>()
+        .0
+        .iter()
         .filter(|chunk| chunk.iter().any(|b| *b != 0))
-        .map(format_mac)
+        .map(|chunk| format_mac(chunk))
         .collect()
 }
 

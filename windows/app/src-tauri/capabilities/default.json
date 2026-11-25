@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The flyout listens for state events and calls QC Buddy's own commands.",
+  "windows": ["flyout"],
+  "permissions": ["core:default"]
+}

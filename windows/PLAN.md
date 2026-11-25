@@ -1,6 +1,6 @@
 # QC Buddy — Windows port plan
 
-Status: M0 done, M1 done (core crate + `qcbuddy` CLI). Next: M2. Branch `feature/windows-port`.
+Status: M0 and M1 done (core crate + `qcbuddy` CLI); M2 in progress (tray app in `windows/app`). Branch `feature/windows-port`.
 
 ## Goal
 
@@ -48,8 +48,10 @@ charging icon (QC45 doesn't report it, issue #3), firmware updates.
 - **Windows APIs**: Microsoft's `windows` crate: Winsock `AF_BTH` RFCOMM,
   Bluetooth device enumeration, Core Audio (`IMMDeviceEnumerator`,
   `IMMNotificationClient`).
-- **Tauri plugins**: `positioner` (flyout above tray), `autostart`,
-  `single-instance`, `store` (EQ presets, settings), `log` (or our own logger).
+- **Tauri plugins**: `single-instance` (M2), `autostart` (M5). EQ presets and
+  logging are in the core (JSON file, our own logger), so no `store` / `log`.
+  The flyout is placed by our own code, not `positioner`: bottom-right of the
+  monitor's work area, which also works with the taskbar on another edge.
 
 ## Layout
 
@@ -64,14 +66,10 @@ windows/
   PLAN.md
   core/                  qcbuddy-core + qcbuddy CLI (protocol, controller, worker,
                          peers, modes, eq_presets, identity, log, platform, fake)
-  src-tauri/
-    Cargo.toml
-    src/
-      main.rs            tray, window, IPC wiring
-      commands.rs        Tauri commands → core::worker::Command; `state` event
-      audio_events.rs    IMMNotificationClient → refresh PC audio (core polls on open today)
-  ui/
-    src/                 React: Header, DevicesCard, NoiseCard, EqualizerCard, Footer
+  app/                   Tauri app (M2)
+    src/                 React flyout: Header, NoiseCard (M2), DevicesCard (M3), EqualizerCard (M4)
+    src-tauri/src/main.rs  tray, flyout placement, commands → core::worker::Command, `state` event
+    icon-src/            SVG sources for the app and tray icons
 ```
 
 Same repo, own folder: shares issues, README, website (bosebuddy.com) and the
@@ -90,9 +88,9 @@ captured test fixtures. The macOS app is unchanged.
 - **IPC**: Tauri commands for actions (`set_mode`, `update_mode`,
   `create_custom_mode`, `apply_eq`, `connect_peer`, ...); one `state` event the
   UI renders from.
-- **Flyout**: frameless, always-on-top window, positioned with
-  `TrayBottomRight`, hidden on blur, toggled by tray left-click; right-click
-  menu with Open / Quit.
+- **Flyout**: frameless, always-on-top window sized to its content,
+  anchored bottom-right of the work area, hidden on blur or Esc, toggled by
+  tray left-click; right-click menu with Open / Quit.
 
 ## Milestones
 

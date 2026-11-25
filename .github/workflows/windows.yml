@@ -27,3 +27,27 @@ jobs:
       - run: cargo test
       - name: CLI smoke test (simulated headset)
         run: cargo run --quiet --bin qcbuddy -- --fake status
+
+  app:
+    # Type-checks the flyout UI and builds the Tauri app (no installer).
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: windows/app/src-tauri
+      - run: npm ci
+      - run: npm run build
+      - run: cargo clippy -- -D warnings
+        working-directory: windows/app/src-tauri

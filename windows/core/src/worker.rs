@@ -7,11 +7,16 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use serde::Deserialize;
+
 use crate::controller::{Controller, State};
 
 pub const POLL_INTERVAL: Duration = Duration::from_secs(15);
 
-#[derive(Clone, Debug, PartialEq)]
+/// Sent by the UI as JSON, e.g. `{"type": "setMode", "args": 2}` or
+/// `{"type": "updateMode", "args": {"index": 2, "rawCnc": 4, "windBlock": false}}`.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(tag = "type", content = "args", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Command {
     Start,
     FlyoutOpened,
@@ -133,5 +138,23 @@ pub fn run(c: &mut Controller, command: Command) {
         Command::ClearError => c.clear_error(),
         Command::PowerOff => c.power_off(),
         Command::Shutdown => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commands_from_ui_json() {
+        let parse = |json: &str| serde_json::from_str::<Command>(json).unwrap();
+        assert_eq!(parse(r#"{"type":"flyoutOpened"}"#), Command::FlyoutOpened);
+        assert_eq!(parse(r#"{"type":"setMode","args":2}"#), Command::SetMode(2));
+        assert_eq!(
+            parse(r#"{"type":"updateMode","args":{"index":2,"rawCnc":4,"windBlock":false}}"#),
+            Command::UpdateMode { index: 2, raw_cnc: 4, wind_block: false }
+        );
+        assert_eq!(parse(r#"{"type":"connect","args":null}"#), Command::Connect(None));
+        assert_eq!(parse(r#"{"type":"applyEq","args":[4,0,-3]}"#), Command::ApplyEq(vec![4, 0, -3]));
     }
 }
