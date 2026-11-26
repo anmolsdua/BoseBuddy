@@ -7,10 +7,8 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
-  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap5 desktop4 rescap">
+  IgnorableNamespaces="uap rescap">
 
   <Identity Name="{{IdentityName}}" Publisher="{{Publisher}}" Version="{{Version}}" ProcessorArchitecture="x64" />
 
@@ -29,7 +27,9 @@
   </Resources>
 
   <Applications>
-    <!-- The tray app. -->
+    <!-- The tray app, and the only one: the Store refuses a package with a
+         hidden app (AppListEntry="none") without a waiver, so the CLI isn't
+         in it as `qcb`. -->
     <Application Id="QCBuddy" Executable="QCBuddy.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="QC Buddy"
@@ -37,24 +37,6 @@
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
-    </Application>
-
-    <!-- The command-line tool: `qcb` on PATH, not in the Start menu. -->
-    <Application Id="qcb" Executable="qcb.exe" EntryPoint="Windows.FullTrustApplication" desktop4:SupportsMultipleInstances="true">
-      <uap:VisualElements
-        DisplayName="qcb"
-        Description="QC Buddy's command-line tool."
-        BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png"
-        AppListEntry="none" />
-      <Extensions>
-        <uap5:Extension Category="windows.appExecutionAlias">
-          <uap5:AppExecutionAlias desktop4:Subsystem="console">
-            <uap5:ExecutionAlias Alias="qcb.exe" />
-          </uap5:AppExecutionAlias>
-        </uap5:Extension>
-      </Extensions>
     </Application>
   </Applications>
 

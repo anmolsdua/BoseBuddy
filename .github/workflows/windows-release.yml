@@ -104,7 +104,7 @@ jobs:
         run: npx tauri build --config src-tauri/tauri.release.conf.json
 
       - name: Package for the Microsoft Store
-        # The same build plus the CLI (as qcb.exe) in an MSIX, which the Store
+        # The same build in an MSIX (the tray app only), which the Store
         # signs. A workflow artifact only, uploaded to Partner Center by hand:
         # MSIX isn't offered outside the Store. The identity is Partner
         # Center's (QCBuddy → Product identity), in repository variables;
@@ -115,7 +115,6 @@ jobs:
           MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
           MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
         run: |
-          cargo build --release --manifest-path windows/core/Cargo.toml --bin qcbuddy
           if (-not $env:MSIX_IDENTITY_NAME -or -not $env:MSIX_PUBLISHER -or -not $env:MSIX_PUBLISHER_DISPLAY_NAME) {
             Write-Output "::warning::MSIX_* repository variables aren't set; the MSIX has a placeholder identity and can't go to the Store."
             $env:MSIX_IDENTITY_NAME = "QCBuddy.Local"

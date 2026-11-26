@@ -1,13 +1,12 @@
 # Packages the release build as an MSIX for the Microsoft Store: the tray app
-# (from `npx tauri build`) and the CLI (from `cargo build --release` in
-# windows/core, shipped as qcb.exe), with msix/AppxManifest.xml and
-# msix/Assets. The Store signs the package; this script doesn't.
+# (from `npx tauri build`), with msix/AppxManifest.xml and msix/Assets. The
+# Store signs the package; this script doesn't.
 #
 #   make msix                         (from the repo root), or
-#   npm run msix                      (in windows/app): builds both, then packages
+#   npm run msix                      (in windows/app): builds, then packages
 #   scripts/package-msix.ps1 [-Build] [-Out <folder>]
 #
-# -Build runs both builds first; without it, they must already be there.
+# -Build runs the build first; without it, it must already be there.
 # The identity defaults to QC Buddy's (Partner Center -> QCBuddy -> Product
 # identity; it's public, in every package the Store ships). Writes
 # <Out>/QCBuddy_<version>.0_x64.msix (default Out: src-tauri/target/msix) and
@@ -37,17 +36,13 @@ if ($Build) {
     try {
         Invoke-Step "npm ci" { npm ci }
         Invoke-Step "tray app (npx tauri build)" { npx tauri build }
-        Invoke-Step "CLI (cargo build --release)" { cargo build --release --manifest-path ../core/Cargo.toml --bin qcbuddy }
     } finally {
         Pop-Location
     }
 }
 
 $tray = Join-Path $app "src-tauri/target/release/QCBuddy.exe"
-$cli = Join-Path $app "../core/target/release/qcbuddy.exe"
-foreach ($exe in $tray, $cli) {
-    if (-not (Test-Path $exe)) { throw "$exe is missing: run with -Build, or build the app (npx tauri build) and the CLI (cargo build --release in windows/core) first." }
-}
+if (-not (Test-Path $tray)) { throw "$tray is missing: run with -Build, or build the app (npx tauri build) first." }
 
 # The Store wants four parts, the last one 0.
 $version = (Get-Content (Join-Path $app "src-tauri/tauri.conf.json") -Raw | ConvertFrom-Json).version
@@ -68,7 +63,6 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory $stage | Out-Null
 
 Copy-Item $tray (Join-Path $stage "QCBuddy.exe")
-Copy-Item $cli (Join-Path $stage "qcb.exe")
 Copy-Item -Recurse (Join-Path $app "msix/Assets") (Join-Path $stage "Assets")
 
 $manifest = Get-Content (Join-Path $app "msix/AppxManifest.xml") -Raw

@@ -254,10 +254,12 @@ Findings:
   - Launch at login becomes a declared `StartupTask` instead of the registry
     Run key (the Run key is virtualized inside MSIX).
   - File writes under AppData are redirected to the package's LocalCache.
-    The app and `qcb` both run in the package and see the same redirected
-    folder, so the hard-coded `%LOCALAPPDATA%\QC Buddy` path keeps working.
+    The app sees the redirected folder, so the hard-coded
+    `%LOCALAPPDATA%\QC Buddy` path keeps working.
   - The Tauri updater is off in the Store copy; the Store updates the app.
-  - The CLI ships as `qcb.exe` (an app execution alias puts it on PATH).
+  - No CLI: an app execution alias needs a second, hidden app
+    (`AppListEntry="none"`), which the Store refuses without a
+    HeadlessAppBypass waiver. `qcb` stays in the GitHub installer.
 - **Listing:** "QC Buddy — works with Bose QuietComfort headphones", no Bose
   logos or artwork; needs a Microsoft developer account, privacy statement
   (no telemetry, logs stay local) and screenshots.

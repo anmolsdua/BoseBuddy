@@ -25,7 +25,6 @@ and no Bose app.
 • Turn multipoint on or off, and put the headphones in pairing mode
 • Sidetone (hear your own voice on calls)
 • Follows Windows light and dark mode
-• `qcb` command-line tool for scripts and keyboard fans
 
 Private by design: no account, no ads, no analytics. QC Buddy talks to your
 headphones over your PC's Bluetooth connection, and nothing leaves your PC.
@@ -50,7 +49,6 @@ From `CHANGELOG.md`, the version's section.
 - Pairing mode
 - Sidetone control
 - Light and dark mode
-- Command-line tool (qcb)
 
 ## Search terms (up to 7)
 
@@ -68,3 +66,8 @@ multipoint
 - **Screenshots:** at least one, 1366×768 or larger: the flyout open above
   the taskbar, light and dark. Crop out other apps and personal device names.
 - **System requirements:** Bluetooth; Windows 10 version 1809 or later, x64.
+- **Restricted capabilities (runFullTrust) justification:** QC Buddy is a
+  desktop tray app (Tauri/Win32). It talks to Bose headphones over Bluetooth
+  Classic RFCOMM sockets and reads the default audio device with Windows Core
+  Audio APIs, neither of which is available inside the AppContainer; it needs
+  full trust to run as a packaged desktop app.

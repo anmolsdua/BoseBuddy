@@ -69,10 +69,11 @@ tag. Tag pushes still run the same release workflow.
 ## Microsoft Store
 
 The Store copy is the same build in an MSIX package (`app/msix/`,
-`app/scripts/package-msix.ps1`), with the CLI as `qcb.exe` on PATH. The Store
-signs it and updates it: the Store copy never reads the update feed, and
-**Check for updates** / `qcb update --install` open its Store page instead
-(`core/src/package.rs`).
+`app/scripts/package-msix.ps1`), tray app only: the Store rejects a package
+with a hidden app (`AppListEntry="none"`) unless Microsoft grants a
+HeadlessAppBypass waiver, so the CLI (`qcb`) is in the GitHub installer only.
+The Store signs and updates it: the Store copy never reads the update feed,
+and **Check for updates** opens its Store page instead (`core/src/package.rs`).
 
 **Once:**
 
@@ -96,7 +97,7 @@ signs it and updates it: the Store copy never reads the update feed, and
 **Between releases:** Actions → **Windows MSIX** → Run workflow builds a
 `.msix` from any branch, without tagging or releasing. Or build one on the
 test PC: `make msix` from the repo root (or `npm run msix` in `app`) builds
-the app and the CLI and packages them with QC Buddy's identity, in
+the app and packages it with QC Buddy's identity, in
 `app\src-tauri\target\msix`.
 
 **Each release**, after step 2 above:
@@ -109,12 +110,14 @@ the app and the CLI and packages them with QC Buddy's identity, in
    Uninstall the GitHub copy first, or both run side by side with separate
    settings. Optionally run the Windows App Certification Kit on the `.msix`.
 3. Partner Center → QCBuddy → new submission → **Packages**: upload the
-   `.msix`, then submit. Certification usually takes 1–3 business days.
+   `.msix`. Partner Center warns that `runFullTrust` is a restricted
+   capability; under **Submission options → Restricted capabilities**, paste
+   the justification from [`STORE-LISTING.md`](STORE-LISTING.md). Then
+   submit. Certification usually takes 1–3 business days.
 
 The Store wants four-part versions ending in `.0` (`X.Y.Z.0`), each higher
 than the last; a rejected submission needs a version bump.
 
 **Package locations:** the Store copy's log and presets are under
 `%LOCALAPPDATA%\Packages\<package family name>\LocalCache\Local\QC Buddy`
-(Windows redirects the app's `%LOCALAPPDATA%\QC Buddy`). `qcb log` from the
-Store copy shows the same folder, since it runs inside the package.
+(Windows redirects the app's `%LOCALAPPDATA%\QC Buddy`).
