@@ -4,22 +4,24 @@
 # msix/Assets. The Store signs the package; this script doesn't.
 #
 #   pwsh scripts/package-msix.ps1 -IdentityName <Package/Identity/Name> `
-#     -Publisher "CN=..." -PublisherDisplayName "<name>" [-Out dist]
+#     -Publisher "CN=..." -PublisherDisplayName "<name>" [-Out <folder>]
 #
 # The three identity values are on Partner Center → QCBuddy → Product
-# identity. Writes <Out>/QCBuddy_<version>.0_x64.msix and leaves the staged
-# files in <Out>/msix (`Add-AppxPackage -Register <Out>\msix\AppxManifest.xml`
-# installs them unsigned, with Developer Mode on).
+# identity. Writes <Out>/QCBuddy_<version>.0_x64.msix (default Out:
+# src-tauri/target/msix) and leaves the staged files in <Out>/msix:
+# `Add-AppxPackage -Register <Out>\msix\AppxManifest.xml` installs them
+# unsigned, with Developer Mode on.
 
 param(
     [Parameter(Mandatory)] [string] $IdentityName,
     [Parameter(Mandatory)] [string] $Publisher,
     [Parameter(Mandatory)] [string] $PublisherDisplayName,
-    [string] $Out = "dist"
+    [string] $Out
 )
 
 $ErrorActionPreference = "Stop"
 $app = Split-Path $PSScriptRoot                      # windows/app
+if (-not $Out) { $Out = Join-Path $app "src-tauri/target/msix" }
 $tray = Join-Path $app "src-tauri/target/release/QCBuddy.exe"
 $cli = Join-Path $app "../core/target/release/qcbuddy.exe"
 foreach ($exe in $tray, $cli) {

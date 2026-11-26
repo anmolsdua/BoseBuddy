@@ -1,0 +1,68 @@
+name: Windows MSIX
+
+# By hand (Actions → Windows MSIX → Run workflow): build QC Buddy from the
+# chosen branch and package it as an MSIX with the Store identity, without
+# tagging or releasing anything. For testing the Store package on the test
+# PC; releases get theirs from windows-release.yml. The package carries the
+# version in tauri.conf.json plus ".0".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Same as windows.yml: no debug symbols in CI builds.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+
+      - name: Build the app and the CLI
+        # No updater artifacts (tauri.release.conf.json), so no signing key.
+        run: |
+          cd windows/app
+          npm ci
+          npx tauri build
+          cargo build --release --manifest-path ../core/Cargo.toml --bin qcbuddy
+
+      - name: Package
+        id: package
+        shell: pwsh
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          if (-not $env:MSIX_IDENTITY_NAME -or -not $env:MSIX_PUBLISHER -or -not $env:MSIX_PUBLISHER_DISPLAY_NAME) {
+            throw "Set the MSIX_* repository variables (see windows/RELEASING.md, Microsoft Store)."
+          }
+          windows/app/scripts/package-msix.ps1 `
+            -IdentityName $env:MSIX_IDENTITY_NAME `
+            -Publisher $env:MSIX_PUBLISHER `
+            -PublisherDisplayName $env:MSIX_PUBLISHER_DISPLAY_NAME `
+            -Out msix-dist
+          $version = (Get-Content windows/app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-msix-${{ steps.package.outputs.version }}-${{ github.sha }}
+          path: msix-dist/*.msix
+          if-no-files-found: error

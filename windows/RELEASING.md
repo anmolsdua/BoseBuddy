@@ -93,6 +93,12 @@ signs it and updates it: the Store copy never reads the update feed, and
   Without them the release still builds, with a placeholder MSIX for local
   testing that the Store rejects.
 
+**Between releases:** Actions → **Windows MSIX** → Run workflow builds a
+`.msix` from any branch, without tagging or releasing. Or build one on the
+test PC: `npx tauri build` in `app`, `cargo build --release --bin qcbuddy` in
+`core`, then `app\scripts\package-msix.ps1` with the three identity values
+(output in `app\src-tauri\target\msix`).
+
 **Each release**, after step 2 above:
 
 1. Download `QCBuddy_X.Y.Z.0_x64.msix` from the release run's artifacts
