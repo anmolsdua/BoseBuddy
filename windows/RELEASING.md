@@ -95,9 +95,9 @@ signs it and updates it: the Store copy never reads the update feed, and
 
 **Between releases:** Actions → **Windows MSIX** → Run workflow builds a
 `.msix` from any branch, without tagging or releasing. Or build one on the
-test PC: `npx tauri build` in `app`, `cargo build --release --bin qcbuddy` in
-`core`, then `app\scripts\package-msix.ps1` with the three identity values
-(output in `app\src-tauri\target\msix`).
+test PC: `make msix` from the repo root (or `npm run msix` in `app`) builds
+the app and the CLI and packages them with QC Buddy's identity, in
+`app\src-tauri\target\msix`.
 
 **Each release**, after step 2 above:
 

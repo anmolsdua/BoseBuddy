@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
+    "msix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-msix.ps1 -Build",
     "test": "vitest run",
     "test:watch": "vitest"
   },

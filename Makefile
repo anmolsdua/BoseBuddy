@@ -1,4 +1,4 @@
-.PHONY: build run selftest install install-dev package clean
+.PHONY: build run selftest install install-dev package msix clean
 
 build:
 	./build.sh
@@ -38,6 +38,12 @@ install-dev:
 
 package:
 	./package.sh
+
+# Windows only (GNU make on Windows, e.g. `winget install ezwinports.make`):
+# build QC Buddy and package it as an MSIX for the Microsoft Store, in
+# windows/app/src-tauri/target/msix. See windows/RELEASING.md.
+msix:
+	powershell -NoProfile -ExecutionPolicy Bypass -File windows/app/scripts/package-msix.ps1 -Build
 
 clean:
 	rm -rf dist

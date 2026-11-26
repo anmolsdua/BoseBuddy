@@ -3,29 +3,50 @@
 # windows/core, shipped as qcb.exe), with msix/AppxManifest.xml and
 # msix/Assets. The Store signs the package; this script doesn't.
 #
-#   pwsh scripts/package-msix.ps1 -IdentityName <Package/Identity/Name> `
-#     -Publisher "CN=..." -PublisherDisplayName "<name>" [-Out <folder>]
+#   make msix                         (from the repo root), or
+#   npm run msix                      (in windows/app): builds both, then packages
+#   scripts/package-msix.ps1 [-Build] [-Out <folder>]
 #
-# The three identity values are on Partner Center → QCBuddy → Product
-# identity. Writes <Out>/QCBuddy_<version>.0_x64.msix (default Out:
-# src-tauri/target/msix) and leaves the staged files in <Out>/msix:
-# `Add-AppxPackage -Register <Out>\msix\AppxManifest.xml` installs them
-# unsigned, with Developer Mode on.
+# -Build runs both builds first; without it, they must already be there.
+# The identity defaults to QC Buddy's (Partner Center -> QCBuddy -> Product
+# identity; it's public, in every package the Store ships). Writes
+# <Out>/QCBuddy_<version>.0_x64.msix (default Out: src-tauri/target/msix) and
+# leaves the staged files in <Out>/msix: `Add-AppxPackage -Register
+# <Out>\msix\AppxManifest.xml` installs them unsigned, with Developer Mode on.
 
 param(
-    [Parameter(Mandatory)] [string] $IdentityName,
-    [Parameter(Mandatory)] [string] $Publisher,
-    [Parameter(Mandatory)] [string] $PublisherDisplayName,
-    [string] $Out
+    [string] $IdentityName = "HangkunUng.QCBuddy",
+    [string] $Publisher = "CN=2B0185DD-C3A5-4E7C-8B91-7F00251BD60B",
+    [string] $PublisherDisplayName = "Hangkun Ung",
+    [string] $Out,
+    [switch] $Build
 )
 
 $ErrorActionPreference = "Stop"
 $app = Split-Path $PSScriptRoot                      # windows/app
 if (-not $Out) { $Out = Join-Path $app "src-tauri/target/msix" }
+
+if ($Build) {
+    # Each step's exit code, since native commands don't stop the script.
+    function Invoke-Step([string] $what, [scriptblock] $step) {
+        Write-Output "== $what"
+        & $step
+        if ($LASTEXITCODE -ne 0) { throw "$what failed ($LASTEXITCODE)" }
+    }
+    Push-Location $app
+    try {
+        Invoke-Step "npm ci" { npm ci }
+        Invoke-Step "tray app (npx tauri build)" { npx tauri build }
+        Invoke-Step "CLI (cargo build --release)" { cargo build --release --manifest-path ../core/Cargo.toml --bin qcbuddy }
+    } finally {
+        Pop-Location
+    }
+}
+
 $tray = Join-Path $app "src-tauri/target/release/QCBuddy.exe"
 $cli = Join-Path $app "../core/target/release/qcbuddy.exe"
 foreach ($exe in $tray, $cli) {
-    if (-not (Test-Path $exe)) { throw "$exe is missing: build the app (npx tauri build) and the CLI (cargo build --release in windows/core) first." }
+    if (-not (Test-Path $exe)) { throw "$exe is missing: run with -Build, or build the app (npx tauri build) and the CLI (cargo build --release in windows/core) first." }
 }
 
 # The Store wants four parts, the last one 0.
