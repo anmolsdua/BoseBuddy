@@ -246,12 +246,18 @@ Findings:
   SmartScreen warning and get automatic updates through the Store.
 - **Tauri doesn't build MSIX**; package the release build with Microsoft's MSIX
   tooling (`makeappx` / MSIX Packaging Tool) in CI.
+  *Done:* `app/msix/AppxManifest.xml` + `app/scripts/package-msix.ps1`;
+  `windows-release.yml` uploads the `.msix` as a workflow artifact. The
+  Store copy detects its package at runtime (`core/src/package.rs`), so
+  there's one build for both channels. See [`RELEASING.md`](RELEASING.md).
 - **MSIX changes the app:**
   - Launch at login becomes a declared `StartupTask` instead of the registry
     Run key (the Run key is virtualized inside MSIX).
-  - File writes under AppData are redirected, so read the log path from the
-    API at runtime rather than hard-coding it.
-  - Turn off the Tauri updater in the Store build; the Store updates the app.
+  - File writes under AppData are redirected to the package's LocalCache.
+    The app and `qcb` both run in the package and see the same redirected
+    folder, so the hard-coded `%LOCALAPPDATA%\QC Buddy` path keeps working.
+  - The Tauri updater is off in the Store copy; the Store updates the app.
+  - The CLI ships as `qcb.exe` (an app execution alias puts it on PATH).
 - **Listing:** "QC Buddy — works with Bose QuietComfort headphones", no Bose
   logos or artwork; needs a Microsoft developer account, privacy statement
   (no telemetry, logs stay local) and screenshots.

@@ -130,12 +130,14 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        // Must be first: a second launch just opens the running app's flyout.
         // Must be first: a second launch opens the running copy's flyout, and
-        // `QCBuddy.exe --check-for-updates` makes the running copy check now.
+        // `QCBuddy.exe --check-for-updates` makes the running copy check now
+        // (the Store copy opens its Store page).
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            show(app);
-            if updates::wants_check(&args) {
+            if !updates::wants_check(&args) {
+                show(app);
+            } else if !updates::defer_to_store() {
+                show(app);
                 updates::check_now(app.clone());
             }
         }))
@@ -173,7 +175,7 @@ fn main() {
             build_tray(&handle)?;
             updates::start(handle.clone());
             // Started with --check-for-updates (no copy was running): check and show the flyout.
-            if updates::wants_check(&std::env::args().collect::<Vec<_>>()) {
+            if updates::wants_check(&std::env::args().collect::<Vec<_>>()) && !updates::defer_to_store() {
                 show(&handle);
                 updates::check_now(handle.clone());
             }
@@ -358,7 +360,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
-            "check-updates" => {
+            // The Store copy opens its Store page instead.
+            "check-updates" if !updates::defer_to_store() => {
                 show(app);
                 updates::check_now(app.clone());
             }

@@ -5,7 +5,8 @@ name: Windows release
 # installer, sign it for the updater, and attach it to a
 # draft GitHub release with latest-windows.json. Nothing is public, and no
 # installed copy is offered the update, until the draft is published by hand
-# (windows-publish-update.yml then updates the feed).
+# (windows-publish-update.yml then updates the feed). The Microsoft Store
+# MSIX is a workflow artifact, uploaded to Partner Center by hand.
 
 on:
   pull_request:
@@ -101,6 +102,36 @@ jobs:
         working-directory: windows/app
         # tauri.release.conf.json adds createUpdaterArtifacts: the .sig file.
         run: npx tauri build --config src-tauri/tauri.release.conf.json
+
+      - name: Package for the Microsoft Store
+        # The same build plus the CLI (as qcb.exe) in an MSIX, which the Store
+        # signs. A workflow artifact only, uploaded to Partner Center by hand:
+        # MSIX isn't offered outside the Store. The identity is Partner
+        # Center's (QCBuddy → Product identity), in repository variables;
+        # without them it's a placeholder package for local testing only.
+        shell: pwsh
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          cargo build --release --manifest-path windows/core/Cargo.toml --bin qcbuddy
+          if (-not $env:MSIX_IDENTITY_NAME -or -not $env:MSIX_PUBLISHER -or -not $env:MSIX_PUBLISHER_DISPLAY_NAME) {
+            Write-Output "::warning::MSIX_* repository variables aren't set; the MSIX has a placeholder identity and can't go to the Store."
+            $env:MSIX_IDENTITY_NAME = "QCBuddy.Local"
+            $env:MSIX_PUBLISHER = "CN=QCBuddyLocal"
+            $env:MSIX_PUBLISHER_DISPLAY_NAME = "QC Buddy (local)"
+          }
+          windows/app/scripts/package-msix.ps1 `
+            -IdentityName $env:MSIX_IDENTITY_NAME `
+            -Publisher $env:MSIX_PUBLISHER `
+            -PublisherDisplayName $env:MSIX_PUBLISHER_DISPLAY_NAME `
+            -Out msix-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-msix-${{ steps.version.outputs.version }}
+          path: msix-dist/*.msix
+          if-no-files-found: error
       - name: Tag the merged release commit
         if: github.event_name == 'pull_request'
         shell: bash

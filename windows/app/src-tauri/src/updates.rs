@@ -13,11 +13,15 @@
 //!
 //! Dev builds don't check automatically unless QCBUDDY_UPDATE_CHECK is set;
 //! QCBUDDY_UPDATE_URL points checks at another feed (for testing).
+//!
+//! The Microsoft Store copy (the same build, in an MSIX package) never reads
+//! the feed: the Store updates it, and a check by hand opens its Store page.
 
 use std::sync::Mutex;
 use std::time::Duration;
 
 use qcbuddy_core::log::{default_path, Log};
+use qcbuddy_core::package;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -91,7 +95,22 @@ pub fn percent(downloaded: u64, total: Option<u64>) -> Option<u8> {
 
 /// Whether this build checks for updates.
 pub fn checks_enabled() -> bool {
-    !cfg!(debug_assertions) || std::env::var_os("QCBUDDY_UPDATE_CHECK").is_some()
+    (!cfg!(debug_assertions) || std::env::var_os("QCBUDDY_UPDATE_CHECK").is_some()) && !package::is_packaged()
+}
+
+/// For a check by hand (tray menu, command-line flag): in the Store copy,
+/// open its Store page instead. True if this was the Store copy.
+pub fn defer_to_store() -> bool {
+    if !package::is_packaged() {
+        return false;
+    }
+    let log = Log::file(default_path());
+    if package::open_store_page() {
+        log.write("update check requested: opened the Store page");
+    } else {
+        log.write("update check requested: couldn't open the Store page");
+    }
+    true
 }
 
 fn set_status(app: &AppHandle, status: UpdateStatus) {

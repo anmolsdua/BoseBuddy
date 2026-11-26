@@ -37,6 +37,16 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - name: CLI smoke test (simulated headset)
         run: cargo run --quiet --bin qcbuddy -- --fake status
+      - name: MSIX packaging (manifest, resources, makeappx)
+        # Stand-in exes (the debug CLI for both) and a placeholder identity:
+        # checks the manifest and the script, not the app. The release
+        # workflow packages the real build.
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force target/release, ../app/src-tauri/target/release | Out-Null
+          Copy-Item target/debug/qcbuddy.exe target/release/qcbuddy.exe
+          Copy-Item target/debug/qcbuddy.exe ../app/src-tauri/target/release/QCBuddy.exe
+          ../app/scripts/package-msix.ps1 -IdentityName QCBuddy.Local -Publisher "CN=QCBuddyLocal" -PublisherDisplayName "QC Buddy (local)" -Out ../../msix-check
 
   app:
     # UI tests (render from core/src/ui_fixtures.rs fixtures), type check,

@@ -44,7 +44,8 @@ commands:
   watch [SECONDS]            act like an open flyout: poll every 15 s, print changes
   log                        log file location and its last 40 lines
   update [--install]         is there a newer QC Buddy? (--install: the tray app
-                             checks and offers Install and restart)
+                             checks and offers Install and restart; the Store
+                             copy opens its Store page)
 
 options:
   --fake                     use a simulated QC45 instead of Bluetooth
@@ -203,6 +204,20 @@ const HEADSET_COMMANDS: &[&str] = &[
 /// code of its own. With --install, the tray app checks and offers it.
 fn update(install: bool) -> ExitCode {
     use qcbuddy_core::update_feed::{feed_version, verdict, Verdict, CURRENT_VERSION, WINDOWS_FEED_URL};
+    // The Store copy updates through the Store, which may not have the
+    // latest GitHub release yet: don't compare it with the GitHub feed.
+    if qcbuddy_core::package::is_packaged() {
+        println!("This is QC Buddy {CURRENT_VERSION} from the Microsoft Store, which keeps it up to date.");
+        if install {
+            if qcbuddy_core::package::open_store_page() {
+                println!("Opened QC Buddy's Store page.");
+            } else {
+                eprintln!("Couldn't open the Microsoft Store.");
+                return ExitCode::FAILURE;
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
     let fetched = std::process::Command::new("curl.exe")
         .args(["--silent", "--show-error", "--fail", "--location", "--max-time", "15", WINDOWS_FEED_URL])
         .output();

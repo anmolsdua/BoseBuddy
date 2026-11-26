@@ -65,3 +65,50 @@ tag. Tag pushes still run the same release workflow.
 - **Check by hand:** `QCBuddy.exe --check-for-updates` (the running copy
   checks and shows the result in the flyout), or right-click the tray icon →
   **Check for updates**.
+
+## Microsoft Store
+
+The Store copy is the same build in an MSIX package (`app/msix/`,
+`app/scripts/package-msix.ps1`), with the CLI as `qcb.exe` on PATH. The Store
+signs it and updates it: the Store copy never reads the update feed, and
+**Check for updates** / `qcb update --install` open its Store page instead
+(`core/src/package.rs`).
+
+**Once:**
+
+- The listing text, privacy policy URL and other fields are in
+  [`STORE-LISTING.md`](STORE-LISTING.md); the policy is
+  [`PRIVACY.md`](PRIVACY.md). Update them when features or data handling
+  change.
+- In Partner Center, the product must be an **MSIX or PWA app** (an "EXE or
+  MSI app" product only takes an installer URL; its type can't be changed).
+- Copy QCBuddy → **Product identity** into repository variables:
+
+  ```sh
+  gh variable set MSIX_IDENTITY_NAME --repo hu13/BoseBuddy --body "<Package/Identity/Name>"
+  gh variable set MSIX_PUBLISHER --repo hu13/BoseBuddy --body "<Package/Identity/Publisher, CN=...>"
+  gh variable set MSIX_PUBLISHER_DISPLAY_NAME --repo hu13/BoseBuddy --body "<Package/Properties/PublisherDisplayName>"
+  ```
+
+  Without them the release still builds, with a placeholder MSIX for local
+  testing that the Store rejects.
+
+**Each release**, after step 2 above:
+
+1. Download `QCBuddy_X.Y.Z.0_x64.msix` from the release run's artifacts
+   (Actions → Windows release → `qcbuddy-msix-X.Y.Z`).
+2. Check it on the test PC (`HARDWARE-CHECKLIST.md`) by installing the
+   unsigned package from the run: unzip the `.msix` (it's a zip) and, with
+   Developer Mode on, `Add-AppxPackage -Register <folder>\AppxManifest.xml`.
+   Uninstall the GitHub copy first, or both run side by side with separate
+   settings. Optionally run the Windows App Certification Kit on the `.msix`.
+3. Partner Center → QCBuddy → new submission → **Packages**: upload the
+   `.msix`, then submit. Certification usually takes 1–3 business days.
+
+The Store wants four-part versions ending in `.0` (`X.Y.Z.0`), each higher
+than the last; a rejected submission needs a version bump.
+
+**Package locations:** the Store copy's log and presets are under
+`%LOCALAPPDATA%\Packages\<package family name>\LocalCache\Local\QC Buddy`
+(Windows redirects the app's `%LOCALAPPDATA%\QC Buddy`). `qcb log` from the
+Store copy shows the same folder, since it runs inside the package.

@@ -9,6 +9,7 @@ pub mod identity;
 pub mod log;
 pub mod models;
 pub mod modes;
+pub mod package;
 pub mod peers;
 pub mod platform;
 pub mod protocol;
